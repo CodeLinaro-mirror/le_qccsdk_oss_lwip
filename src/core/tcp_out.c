@@ -124,6 +124,17 @@
 #endif
 #endif
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static struct pbuf *tcp_output_alloc_header_common(u32_t ackno, u16_t optlen, u16_t datalen,
+                        u32_t seqno_be /* already in network byte order */,
+                        u16_t src_port, u16_t dst_port, u8_t flags, u16_t wnd);
+__attribute__ ((section(".lwip_nc_text"))) static struct pbuf *tcp_output_alloc_header(struct tcp_pcb *pcb, u16_t optlen, u16_t datalen,
+					 u32_t seqno_be /* already in network byte order */);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_output_fill_options(const struct tcp_pcb *pcb, struct pbuf *p, u8_t optflags, u8_t num_sacks);
+__attribute__ ((section(".lwip_nc_text"))) static err_t tcp_output_control_segment(const struct tcp_pcb *pcb, struct pbuf *p,
+                           const ip_addr_t *src, const ip_addr_t *dst);
+__attribute__ ((section(".lwip_nc_text"))) err_t tcp_zero_window_probe(struct tcp_pcb *pcb);
+#endif
 /* Forward declarations.*/
 static err_t tcp_output_segment(struct tcp_seg *seg, struct tcp_pcb *pcb, struct netif *netif);
 

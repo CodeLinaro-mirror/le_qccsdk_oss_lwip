@@ -39,6 +39,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_ARP || LWIP_ETHERNET
 

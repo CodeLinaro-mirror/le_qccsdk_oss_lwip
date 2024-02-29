@@ -42,6 +42,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_IPV6  /* don't build if not configured for use in lwipopts.h */
 

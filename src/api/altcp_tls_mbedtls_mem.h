@@ -1,11 +1,16 @@
 /**
  * @file
- * Base TCP API definitions shared by TCP and ALTCP\n
- * See also @ref tcp_raw
+ * Application layered TCP/TLS connection API (to be used from TCPIP thread)
+ *
+ * This file contains memory management function prototypes for a TLS layer using mbedTLS.
+ *
+ * Memory management contains:
+ * - allocating/freeing altcp_mbedtls_state_t
+ * - allocating/freeing memory used in the mbedTLS library
  */
 
 /*
- * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
+ * Copyright (c) 2017 Simon Goldschmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -32,61 +37,36 @@
  *
  * This file is part of the lwIP TCP/IP stack.
  *
- * Author: Adam Dunkels <adam@sics.se>
+ * Author: Simon Goldschmidt <goldsimon@gmx.de>
  *
  */
-#ifndef LWIP_HDR_TCPBASE_H
-#define LWIP_HDR_TCPBASE_H
+#ifndef LWIP_HDR_ALTCP_MBEDTLS_MEM_H
+#define LWIP_HDR_ALTCP_MBEDTLS_MEM_H
 
 #include "lwip/opt.h"
 
-#if LWIP_TCP /* don't build if not configured for use in lwipopts.h */
+#if LWIP_ALTCP /* don't build if not configured for use in lwipopts.h */
+
+#include "lwip/apps/altcp_tls_mbedtls_opts.h"
+
+#if LWIP_ALTCP_TLS && LWIP_ALTCP_TLS_MBEDTLS
+
+#include "altcp_tls_mbedtls_structs.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-#if LWIP_WND_SCALE
-typedef u32_t tcpwnd_size_t;
-#else
-typedef u16_t tcpwnd_size_t;
-#endif
-
-enum tcp_state {
-  CLOSED      = 0,
-  LISTEN      = 1,
-  SYN_SENT    = 2,
-  SYN_RCVD    = 3,
-  ESTABLISHED = 4,
-  FIN_WAIT_1  = 5,
-  FIN_WAIT_2  = 6,
-  CLOSE_WAIT  = 7,
-  CLOSING     = 8,
-  LAST_ACK    = 9,
-  TIME_WAIT   = 10
-};
-/* ATTENTION: this depends on state number ordering! */
-#define TCP_STATE_IS_CLOSING(state) ((state) >= FIN_WAIT_1)
-
-/* Flags for "apiflags" parameter in tcp_write */
-#define TCP_WRITE_FLAG_COPY 0x01
-#define TCP_WRITE_FLAG_MORE 0x02
-
-#define TCP_PRIO_MIN    1
-#define TCP_PRIO_NORMAL 64
-#define TCP_PRIO_MAX    127
-
-#ifdef NT_FN_RRAM_PERF_BUILD
-__attribute__ ((section(".lwip_nc_text"))) const char* tcp_debug_state_str(enum tcp_state s);
-#else
-const char* tcp_debug_state_str(enum tcp_state s);
-#endif
+void altcp_mbedtls_mem_init(void);
+altcp_mbedtls_state_t *altcp_mbedtls_alloc(void *conf);
+void altcp_mbedtls_free(void *conf, altcp_mbedtls_state_t *state);
+void *altcp_mbedtls_alloc_config(size_t size);
+void altcp_mbedtls_free_config(void *item);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* LWIP_TCP */
-
-#endif /* LWIP_HDR_TCPBASE_H */
+#endif /* LWIP_ALTCP_TLS && LWIP_ALTCP_TLS_MBEDTLS */
+#endif /* LWIP_ALTCP */
+#endif /* LWIP_HDR_ALTCP_MBEDTLS_MEM_H */

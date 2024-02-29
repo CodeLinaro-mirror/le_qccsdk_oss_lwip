@@ -79,6 +79,11 @@
 #include "lwip/etharp.h"
 #include "lwip/prot/dhcp.h"
 #include "lwip/prot/iana.h"
+#include "nt_logger_api.h"
+#include "nt_wfm_wmi_interface.h"
+#ifdef SUPPORT_COEX
+#include "wlan_wmi.h"
+#endif
 
 #include <string.h>
 
@@ -186,6 +191,10 @@ static u8_t xid_initialised;
 
 static struct udp_pcb *dhcp_pcb;
 static u8_t dhcp_pcb_refcount;
+
+#ifdef NT_WFM
+extern wmi_msg_struct_t* Cmd_Translation_wlan;
+#endif
 
 /* DHCP client state machine functions */
 static err_t dhcp_discover(struct netif *netif);
@@ -698,6 +707,10 @@ dhcp_set_struct(struct netif *netif, struct dhcp *dhcp)
   memset(dhcp, 0, sizeof(struct dhcp));
   /* dhcp_set_state(&dhcp, DHCP_STATE_OFF); */
   netif_set_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP, dhcp);
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+  lwip_start_timer(dhcp_coarse_tmr);
+  lwip_start_timer(dhcp_fine_tmr);
+#endif
 }
 
 /**
@@ -741,7 +754,7 @@ dhcp_start(struct netif *netif)
 
   LWIP_ASSERT_CORE_LOCKED();
   LWIP_ERROR("netif != NULL", (netif != NULL), return ERR_ARG;);
-  LWIP_ERROR("netif is not up, old style port?", netif_is_up(netif), return ERR_ARG;);
+  //LWIP_ERROR("netif is not up, old style port?", netif_is_up(netif), return ERR_ARG;);
   dhcp = netif_dhcp_data(netif);
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("dhcp_start(netif=%p) %c%c%"U16_F"\n", (void *)netif, netif->name[0], netif->name[1], (u16_t)netif->num));
 
@@ -762,6 +775,10 @@ dhcp_start(struct netif *netif)
 
     /* store this dhcp client in the netif */
     netif_set_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP, dhcp);
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+    lwip_start_timer(dhcp_coarse_tmr);
+    lwip_start_timer(dhcp_fine_tmr);
+#endif
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_start(): allocated dhcp"));
     /* already has DHCP client attached */
   } else {
@@ -993,6 +1010,9 @@ dhcp_discover(struct netif *netif)
   dhcp_set_state(dhcp, DHCP_STATE_SELECTING);
   /* create and initialize the DHCP message header */
   p_out = dhcp_create_msg(netif, dhcp, DHCP_DISCOVER, &options_out_len);
+#ifdef SUPPORT_COEX
+  post_message_to_nt_wlan(WMI_COEX_CRIT_PROTO_START, NULL);
+#endif
   if (p_out != NULL) {
     struct dhcp_msg *msg_out = (struct dhcp_msg *)p_out->payload;
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_discover: making request\n"));
@@ -1008,6 +1028,7 @@ dhcp_discover(struct netif *netif)
     dhcp_option_trailer(options_out_len, msg_out->options, p_out);
 
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_discover: sendto(DISCOVER, IP_ADDR_BROADCAST, LWIP_IANA_PORT_DHCP_SERVER)\n"));
+    NT_LOG_PRINT(COMMON,INFO,"dhcp_discover packet sending\r\n");
     udp_sendto_if_src(dhcp_pcb, p_out, IP_ADDR_BROADCAST, LWIP_IANA_PORT_DHCP_SERVER, netif, IP4_ADDR_ANY);
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_discover: deleting()ing\n"));
     pbuf_free(p_out);
@@ -1135,9 +1156,19 @@ dhcp_bind(struct netif *netif)
   /* netif is now bound to DHCP leased address - set this before assigning the address
      to ensure the callback can use dhcp_supplied_address() */
   dhcp_set_state(dhcp, DHCP_STATE_BOUND);
+  NT_LOG_PRINT(COMMON,INFO,"DHCP_BIND:  IP: 0x%08"X32_F" SN: 0x%08"X32_F" GW: 0x%08"X32_F"\r\n",
+		  ip4_addr_get_u32(&dhcp->offered_ip_addr), ip4_addr_get_u32(&sn_mask), ip4_addr_get_u32(&gw_addr));
 
   netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
   /* interface is used by routing now that an address is set */
+#ifdef NT_WFM
+  Cmd_Translation_wlan->msg_struct.event_notify(eWiFiSuccess ,dhcp_success_event_id ,&dhcp->server_ip_addr);
+#endif
+
+#if defined(CONFIG_WMI_EVENT)
+    wlan_wmi_local_evt_notification(WMI_IP_DHCP_SUCCESS_EVTID, (void *)&(dhcp->server_ip_addr), sizeof(ip_addr_t));
+#endif
+
 }
 
 /**
@@ -1361,6 +1392,7 @@ dhcp_release_and_stop(struct netif *netif)
       udp_sendto_if(dhcp_pcb, p_out, &server_ip_addr, LWIP_IANA_PORT_DHCP_SERVER, netif);
       pbuf_free(p_out);
       LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("dhcp_release: RELEASED, DHCP_STATE_OFF\n"));
+      NT_LOG_PRINT(COMMON,INFO,"dhcp_release: RELEASED, DHCP_STATE_OFF\r\n");
     } else {
       /* sending release failed, but that's not a problem since the correct behaviour of dhcp does not rely on release */
       LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_SERIOUS, ("dhcp_release: could not allocate DHCP request\n"));
@@ -1778,6 +1810,9 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
   LWIP_UNUSED_ARG(addr);
   LWIP_UNUSED_ARG(port);
 
+  NT_LOG_PRINT(COMMON,INFO,"dhcp_recv from DHCP server %"U16_F".%"U16_F".%"U16_F".%"U16_F" port %"U16_F"\r\n",
+          ip4_addr1_16(ip_2_ip4(addr)), ip4_addr2_16(ip_2_ip4(addr)), ip4_addr3_16(ip_2_ip4(addr)), ip4_addr4_16(ip_2_ip4(addr)), port);
+
   if (p->len < DHCP_MIN_REPLY_LEN) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("DHCP reply message or pbuf too short\n"));
     goto free_pbuf_and_return;
@@ -1822,6 +1857,11 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
   /* message type is DHCP ACK? */
   if (msg_type == DHCP_ACK) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("DHCP_ACK received\n"));
+    NT_LOG_PRINT(COMMON,INFO,"DHCP_ACK received\r\n");
+
+#ifdef SUPPORT_COEX
+    post_message_to_nt_wlan(WMI_COEX_CRIT_PROTO_STOP, NULL);
+#endif
     /* in requesting state? */
     if (dhcp->state == DHCP_STATE_REQUESTING) {
       dhcp_handle_ack(netif, msg_in);
@@ -1850,11 +1890,16 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
            ((dhcp->state == DHCP_STATE_REBOOTING) || (dhcp->state == DHCP_STATE_REQUESTING) ||
             (dhcp->state == DHCP_STATE_REBINDING) || (dhcp->state == DHCP_STATE_RENEWING  ))) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("DHCP_NAK received\n"));
+#ifdef SUPPORT_COEX
+    post_message_to_nt_wlan(WMI_COEX_CRIT_PROTO_STOP, NULL);
+#endif
+    NT_LOG_PRINT(COMMON,INFO,"DHCP_NAK received\r\n");
     dhcp_handle_nak(netif);
   }
   /* received a DHCP_OFFER in DHCP_STATE_SELECTING state? */
   else if ((msg_type == DHCP_OFFER) && (dhcp->state == DHCP_STATE_SELECTING)) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("DHCP_OFFER received in DHCP_STATE_SELECTING state\n"));
+    NT_LOG_PRINT(COMMON,INFO,"DHCP_OFFER received in DHCP_STATE_SELECTING state\r\n");
     /* remember offered lease */
     dhcp_handle_offer(netif, msg_in);
   }
@@ -1987,4 +2032,18 @@ dhcp_supplied_address(const struct netif *netif)
   return 0;
 }
 
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+u8_t
+dhcp_tmr_needed()
+{
+  struct netif *netif;
+
+  NETIF_FOREACH(netif) {
+	  if (netif_dhcp_data(netif) != NULL) {
+		  return 1;
+	  }
+  }
+  return 0;
+}
+#endif
 #endif /* LWIP_IPV4 && LWIP_DHCP */

@@ -336,10 +336,17 @@ typedef struct ip6_addr ip6_addr_t;
 
 #define IP6ADDR_STRLEN_MAX    46
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) int ip6addr_aton(const char *cp, ip6_addr_t *addr);
+/** returns ptr to static buffer; not reentrant! */
+__attribute__ ((section(".lwip_nc_text"))) char *ip6addr_ntoa(const ip6_addr_t *addr);
+__attribute__ ((section(".lwip_nc_text"))) char *ip6addr_ntoa_r(const ip6_addr_t *addr, char *buf, int buflen);
+#else
 int ip6addr_aton(const char *cp, ip6_addr_t *addr);
 /** returns ptr to static buffer; not reentrant! */
 char *ip6addr_ntoa(const ip6_addr_t *addr);
 char *ip6addr_ntoa_r(const ip6_addr_t *addr, char *buf, int buflen);
+#endif
 
 
 

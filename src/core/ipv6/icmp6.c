@@ -56,6 +56,7 @@
 #include "lwip/stats.h"
 
 #include <string.h>
+#include "safeAPI.h"
 
 #if LWIP_ICMP6_DATASIZE == 0
 #undef LWIP_ICMP6_DATASIZE

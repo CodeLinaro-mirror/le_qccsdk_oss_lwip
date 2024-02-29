@@ -38,6 +38,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_SOCKET /* don't build if not configured for use in lwipopts.h */
 
@@ -3646,6 +3647,24 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
         }
         break;
 #endif /* LWIP_IPV6_MLD */
+#if LWIP_IPV6 && LWIP_MULTICAST_TX_OPTIONS && LWIP_UDP
+        case IPV6_MULTICAST_HOPS:
+        	LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, u8_t, NETCONN_UDP);
+        	udp_set_multicast_ttl(sock->conn->pcb.udp, (u8_t)(*(const u8_t *)optval));
+        	break;
+        case IPV6_MULTICAST_IF:
+        	LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, u8_t, NETCONN_UDP);
+        	udp_set_multicast_netif_index(sock->conn->pcb.udp, (u8_t)(*(const u8_t *)optval));
+        break;
+        case IPV6_MULTICAST_LOOP:
+        	LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB_TYPE(sock, optlen, u8_t, NETCONN_UDP);
+        	if (*(const u8_t *)optval) {
+        		udp_set_flags(sock->conn->pcb.udp, UDP_FLAGS_MULTICAST_LOOP);
+        	} else {
+        		udp_clear_flags(sock->conn->pcb.udp, UDP_FLAGS_MULTICAST_LOOP);
+        	}
+        	break;
+#endif /* LWIP_IPV6 && LWIP_MULTICAST_TX_OPTIONS && LWIP_UDP */
         default:
           LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_setsockopt(%d, IPPROTO_IPV6, UNIMPL: optname=0x%x, ..)\n",
                                       s, optname));
@@ -3965,7 +3984,7 @@ lwip_inet_pton(int af, const char *src, void *dst)
       ip6_addr_t addr;
       err = ip6addr_aton(src, &addr);
       if (err) {
-        memcpy(dst, &addr.addr, sizeof(addr.addr));
+        memscpy(dst, sizeof(addr.addr), &addr.addr, sizeof(addr.addr));
       }
       break;
     }

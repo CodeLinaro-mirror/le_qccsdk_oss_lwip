@@ -41,6 +41,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_IPV6  /* don't build if not configured for use in lwipopts.h */
 
@@ -236,7 +237,7 @@ ip6addr_ntoa_r(const ip6_addr_t *addr, char *buf, int buflen)
     if (buflen < (int)sizeof(IP4MAPPED_HEADER)) {
       return NULL;
     }
-    memcpy(buf, IP4MAPPED_HEADER, sizeof(IP4MAPPED_HEADER));
+    memscpy(buf, sizeof(IP4MAPPED_HEADER), IP4MAPPED_HEADER, sizeof(IP4MAPPED_HEADER));
     addr4.addr = addr->addr[3];
     ret = ip4addr_ntoa_r(&addr4, buf_ip4, buflen_ip4);
     if (ret != buf_ip4) {

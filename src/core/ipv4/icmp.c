@@ -50,6 +50,7 @@
 #include "lwip/stats.h"
 
 #include <string.h>
+#include "safeAPI.h"
 
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME

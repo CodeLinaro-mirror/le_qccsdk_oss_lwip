@@ -269,6 +269,9 @@ igmp_lookup_group(struct netif *ifp, const ip4_addr_t *addr)
                   (ip4_addr_cmp(addr, &allsystems) != 0));
       group->next = NULL;
       netif_set_client_data(ifp, LWIP_NETIF_CLIENT_DATA_INDEX_IGMP, group);
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+      lwip_start_timer(igmp_tmr);
+#endif
     } else {
       /* append _after_ first entry */
       LWIP_ASSERT("igmp_lookup_group: all except first group must not be allsystems",
@@ -797,5 +800,20 @@ igmp_send(struct netif *netif, struct igmp_group *group, u8_t type)
     IGMP_STATS_INC(igmp.memerr);
   }
 }
+
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+u8_t
+igmp_tmr_needed()
+{
+  struct netif *netif;
+
+  NETIF_FOREACH(netif) {
+	  if (netif_igmp_data(netif) != NULL) {
+		  return 1;
+	  }
+  }
+  return 0;
+}
+#endif
 
 #endif /* LWIP_IPV4 && LWIP_IGMP */

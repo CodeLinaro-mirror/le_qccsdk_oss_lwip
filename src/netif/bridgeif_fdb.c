@@ -46,6 +46,7 @@
 #include "lwip/mem.h"
 #include "lwip/timeouts.h"
 #include <string.h>
+#include "safeAPI.h"
 
 #define BRIDGEIF_AGE_TIMER_MS 1000
 
@@ -105,7 +106,7 @@ bridgeif_fdb_update_src(void *fdb_ptr, struct eth_addr *src_addr, u8_t port_idx)
         LWIP_DEBUGF(BRIDGEIF_FDB_DEBUG, ("br: create src %02x:%02x:%02x:%02x:%02x:%02x (from %d) @ idx %d\n",
                                          src_addr->addr[0], src_addr->addr[1], src_addr->addr[2], src_addr->addr[3], src_addr->addr[4], src_addr->addr[5],
                                          port_idx, i));
-        memcpy(&e->addr, src_addr, sizeof(struct eth_addr));
+        memscpy(&e->addr, sizeof(struct eth_addr), src_addr, sizeof(struct eth_addr));
         e->ts = BR_FDB_TIMEOUT_SEC;
         e->port = port_idx;
         e->used = 1;

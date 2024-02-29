@@ -119,6 +119,11 @@ struct sys_timeo** sys_timeouts_get_next_timeout(void);
 void lwip_cyclic_timer(void *arg);
 #endif
 
+void sys_timeouts_deinit(void);
+
+void sys_timeouts_pause_all(void);
+void sys_timeouts_unpause_all(void);
+
 #endif /* LWIP_TIMERS */
 
 #ifdef __cplusplus

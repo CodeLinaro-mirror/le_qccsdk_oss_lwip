@@ -116,6 +116,19 @@ extern struct udp_pcb *udp_pcbs;
 
 /* The following functions is the application layer interface to the
    UDP code. */
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) struct udp_pcb * udp_new        (void);
+__attribute__ ((section(".lwip_nc_text"))) struct udp_pcb * udp_new_ip_type(u8_t type);
+__attribute__ ((section(".lwip_nc_text"))) void             udp_remove     (struct udp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) err_t            udp_bind       (struct udp_pcb *pcb, const ip_addr_t *ipaddr,
+                                 u16_t port);
+__attribute__ ((section(".lwip_nc_text"))) void             udp_bind_netif (struct udp_pcb *pcb, const struct netif* netif);
+__attribute__ ((section(".lwip_nc_text"))) err_t            udp_connect    (struct udp_pcb *pcb, const ip_addr_t *ipaddr,
+                                 u16_t port);
+__attribute__ ((section(".lwip_nc_text"))) void             udp_disconnect (struct udp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void             udp_recv       (struct udp_pcb *pcb, udp_recv_fn recv,
+                                 void *recv_arg);
+#else
 struct udp_pcb * udp_new        (void);
 struct udp_pcb * udp_new_ip_type(u8_t type);
 void             udp_remove     (struct udp_pcb *pcb);
@@ -127,6 +140,7 @@ err_t            udp_connect    (struct udp_pcb *pcb, const ip_addr_t *ipaddr,
 void             udp_disconnect (struct udp_pcb *pcb);
 void             udp_recv       (struct udp_pcb *pcb, udp_recv_fn recv,
                                  void *recv_arg);
+#endif
 err_t            udp_sendto_if  (struct udp_pcb *pcb, struct pbuf *p,
                                  const ip_addr_t *dst_ip, u16_t dst_port,
                                  struct netif *netif);
@@ -162,7 +176,11 @@ err_t            udp_sendto_if_src_chksum(struct udp_pcb *pcb, struct pbuf *p,
 /* The following functions are the lower layer interface to UDP. */
 void             udp_input      (struct pbuf *p, struct netif *inp);
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void             udp_init       (void);
+#else
 void             udp_init       (void);
+#endif
 
 /* for compatibility with older implementation */
 #define udp_new_ip6() udp_new_ip_type(IPADDR_TYPE_V6)
@@ -184,7 +202,11 @@ void udp_debug_print(struct udp_hdr *udphdr);
 #define udp_debug_print(udphdr)
 #endif
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void udp_netif_ip_addr_changed(const ip_addr_t* old_addr, const ip_addr_t* new_addr);
+#else
 void udp_netif_ip_addr_changed(const ip_addr_t* old_addr, const ip_addr_t* new_addr);
+#endif
 
 #ifdef __cplusplus
 }

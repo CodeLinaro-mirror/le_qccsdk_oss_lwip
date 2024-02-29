@@ -44,6 +44,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_IPV4 && LWIP_ARP /* don't build if not configured for use in lwipopts.h */
 
@@ -57,6 +58,17 @@
 
 #include <string.h>
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static void etharp_free_entry(int i);
+__attribute__ ((section(".lwip_nc_text"))) static s16_t etharp_find_entry(const ip4_addr_t *ipaddr, u8_t flags, struct netif *netif);
+__attribute__ ((section(".lwip_nc_text"))) static err_t etharp_update_arp_entry(struct netif *netif, const ip4_addr_t *ipaddr, struct eth_addr *ethaddr, u8_t flags);
+__attribute__ ((section(".lwip_nc_text"))) static err_t etharp_raw(struct netif *netif, const struct eth_addr *ethsrc_addr,
+           const struct eth_addr *ethdst_addr,
+           const struct eth_addr *hwsrc_addr, const ip4_addr_t *ipsrc_addr,
+           const struct eth_addr *hwdst_addr, const ip4_addr_t *ipdst_addr,
+           const u16_t opcode);
+__attribute__ ((section(".lwip_nc_text"))) static err_t etharp_request_dst(struct netif *netif, const ip4_addr_t *ipaddr, const struct eth_addr *hw_dst_addr);
+#endif
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
 #endif
@@ -103,6 +115,21 @@ struct etharp_entry {
 };
 
 static struct etharp_entry arp_table[ARP_TABLE_SIZE];
+
+void nt_getupdatedARPCache(void)
+{
+
+	char buffer[ 200 ];
+	int row;
+	char index[15]="ARP index";
+	for( row = 0;row<ARP_TABLE_SIZE; row++)
+	{
+		snprintf(buffer,sizeof(buffer),"%s-%d\r\t\t%s\t\t%020x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02\t\t%d\t\t%d\r\n",
+				index,row,ipaddr_ntoa(&(arp_table[row].ipaddr)),(u16_t)arp_table[row].ethaddr.addr[0], (u16_t)arp_table[row].ethaddr.addr[1], (u16_t)arp_table[row].ethaddr.addr[2],
+	              (u16_t)arp_table[row].ethaddr.addr[3], (u16_t)arp_table[row].ethaddr.addr[4], (u16_t)arp_table[row].ethaddr.addr[5],arp_table[row].ctime,arp_table[row].state);
+		nt_dbg_print(buffer);
+	}
+}
 
 #if !LWIP_NETIF_HWADDRHINT
 static netif_addr_idx_t etharp_cached_entry;
@@ -454,6 +481,9 @@ etharp_update_arp_entry(struct netif *netif, const ip4_addr_t *ipaddr, struct et
     /* mark it stable */
     arp_table[i].state = ETHARP_STATE_STABLE;
   }
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+  lwip_start_timer(etharp_tmr);
+#endif
 
   /* record network interface */
   arp_table[i].netif = netif;
@@ -965,6 +995,9 @@ etharp_query(struct netif *netif, const ip4_addr_t *ipaddr, struct pbuf *q)
   if (arp_table[i].state == ETHARP_STATE_EMPTY) {
     is_new_entry = 1;
     arp_table[i].state = ETHARP_STATE_PENDING;
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+    lwip_start_timer(etharp_tmr);
+#endif
     /* record network interface for re-sending arp request in etharp_tmr */
     arp_table[i].netif = netif;
   }
@@ -1200,5 +1233,20 @@ etharp_request(struct netif *netif, const ip4_addr_t *ipaddr)
   LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE, ("etharp_request: sending ARP request.\n"));
   return etharp_request_dst(netif, ipaddr, &ethbroadcast);
 }
+
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+int
+etharp_tmr_needed()
+{
+  int i;
+
+  for (i = 0; i < ARP_TABLE_SIZE; ++i) {
+	if (arp_table[i].state != ETHARP_STATE_EMPTY) {
+		return 1;
+	}
+  }
+  return 0;
+}
+#endif
 
 #endif /* LWIP_IPV4 && LWIP_ARP */

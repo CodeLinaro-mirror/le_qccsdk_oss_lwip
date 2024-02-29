@@ -55,6 +55,7 @@
 #include "netif/ethernet.h"
 
 #include <string.h>
+#include "safeAPI.h"
 
 /**
  * Resolve and fill-in Ethernet address header for outgoing IPv6 packet.

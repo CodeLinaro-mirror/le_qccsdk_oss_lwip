@@ -98,6 +98,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_TCP /* don't build if not configured for use in lwipopts.h */
 
@@ -114,6 +115,20 @@
 
 #include <string.h>
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_free_listen(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_remove_listener(struct tcp_pcb *list, struct tcp_pcb_listen *lpcb);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_listen_closed(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) static err_t tcp_close_shutdown(struct tcp_pcb *pcb, u8_t rst_on_unacked_data);
+__attribute__ ((section(".lwip_nc_text"))) static err_t tcp_close_shutdown_fin(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) static err_t tcp_accept_null(void *arg, struct tcp_pcb *pcb, err_t err);
+__attribute__ ((section(".lwip_nc_text"))) static u16_t tcp_new_port(void);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_kill_prio(u8_t prio);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_kill_state(enum tcp_state state);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_kill_timewait(void);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_handle_closepend(void);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_netif_ip_addr_changed_pcblist(const ip_addr_t *old_addr, struct tcp_pcb *pcb_list);
+#endif
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
 #endif
@@ -901,7 +916,7 @@ tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
   }
 #if LWIP_TCP_PCB_NUM_EXT_ARGS
   /* copy over ext_args to listening pcb  */
-  memcpy(&lpcb->ext_args, &pcb->ext_args, sizeof(pcb->ext_args));
+  memscpy(&lpcb->ext_args, sizeof(pcb->ext_args), &pcb->ext_args, sizeof(pcb->ext_args));
 #endif
   tcp_free(pcb);
 #if LWIP_CALLBACK_API

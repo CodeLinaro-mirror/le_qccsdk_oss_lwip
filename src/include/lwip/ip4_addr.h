@@ -151,7 +151,11 @@ struct netif;
 u8_t ip4_addr_isbroadcast_u32(u32_t addr, const struct netif *netif);
 
 #define ip_addr_netmask_valid(netmask) ip4_addr_netmask_valid((netmask)->addr)
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) u8_t ip4_addr_netmask_valid(u32_t netmask);
+#else
 u8_t ip4_addr_netmask_valid(u32_t netmask);
+#endif
 
 #define ip4_addr_ismulticast(addr1) (((addr1)->addr & PP_HTONL(0xf0000000UL)) == PP_HTONL(0xe0000000UL))
 
@@ -201,11 +205,19 @@ u8_t ip4_addr_netmask_valid(u32_t netmask);
 /** For backwards compatibility */
 #define ip_ntoa(ipaddr)  ipaddr_ntoa(ipaddr)
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) u32_t ipaddr_addr(const char *cp);
+__attribute__ ((section(".lwip_nc_text"))) int ip4addr_aton(const char *cp, ip4_addr_t *addr);
+/** returns ptr to static buffer; not reentrant! */
+__attribute__ ((section(".lwip_nc_text"))) char *ip4addr_ntoa(const ip4_addr_t *addr);
+__attribute__ ((section(".lwip_nc_text"))) char *ip4addr_ntoa_r(const ip4_addr_t *addr, char *buf, int buflen);
+#else
 u32_t ipaddr_addr(const char *cp);
 int ip4addr_aton(const char *cp, ip4_addr_t *addr);
 /** returns ptr to static buffer; not reentrant! */
 char *ip4addr_ntoa(const ip4_addr_t *addr);
 char *ip4addr_ntoa_r(const ip4_addr_t *addr, char *buf, int buflen);
+#endif
 
 #ifdef __cplusplus
 }

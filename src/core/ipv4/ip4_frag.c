@@ -50,6 +50,7 @@
 #include "lwip/icmp.h"
 
 #include <string.h>
+#include "safeAPI.h"
 
 #if IP_REASSEMBLY
 /**
@@ -303,6 +304,10 @@ ip_reass_enqueue_new_datagram(struct ip_hdr *fraghdr, int clen)
   /* enqueue the new structure to the front of the list */
   ipr->next = reassdatagrams;
   reassdatagrams = ipr;
+
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+  lwip_start_timer(ip_reass_tmr);
+#endif
   /* copy the ip header for later tests and input */
   /* @todo: no ip options supported? */
   SMEMCPY(&(ipr->iphdr), fraghdr, IP_HLEN);
@@ -889,6 +894,17 @@ memerr:
   MIB2_STATS_INC(mib2.ipfragfails);
   return ERR_MEM;
 }
+
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+int
+ip_reass_tmr_needed()
+{
+  if(reassdatagrams == NULL) {
+	  return 0;
+  }
+  return 1;
+}
+#endif
 #endif /* IP_FRAG */
 
 #endif /* LWIP_IPV4 */

@@ -225,6 +225,84 @@ memp_init(void)
 {
   u16_t i;
 
+#ifdef CONFIG_LWIP_HEAP_POOL
+#if LWIP_MEM_PRE_ALLOC_FROM_HEAP
+  /* Pre allocating memory for PCBs and pbufs from the heap */
+#if LWIP_RAW
+    memp_RAW_PCB.base=pvPortMalloc((MEMP_NUM_RAW_PCB) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct raw_pcb))));
+#endif
+#if LWIP_UDP
+    memp_UDP_PCB.base=pvPortMalloc((MEMP_NUM_UDP_PCB) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct udp_pcb))));
+#endif /* LWIP_UDP */
+#if LWIP_TCP
+    memp_TCP_PCB.base=pvPortMalloc((MEMP_NUM_TCP_PCB) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct tcp_pcb))));
+    memp_TCP_PCB_LISTEN.base=pvPortMalloc((MEMP_NUM_TCP_PCB_LISTEN) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct tcp_pcb_listen))));
+    memp_TCP_SEG.base=pvPortMalloc((MEMP_NUM_TCP_SEG) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct tcp_seg))));
+#endif /* LWIP_TCP */
+#if LWIP_ALTCP && LWIP_TCP
+    memp_ALTCP_PCB.base=pvPortMalloc((MEMP_NUM_ALTCP_PCB) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct altcp_pcb))));
+#endif /* LWIP_ALTCP && LWIP_TCP */
+#if LWIP_IPV4 && IP_REASSEMBLY
+    memp_REASSDATA.base=pvPortMalloc((MEMP_NUM_REASSDATA) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct ip_reassdata))));
+#endif /* LWIP_IPV4 && IP_REASSEMBLY */
+#if (IP_FRAG && !LWIP_NETIF_TX_SINGLE_PBUF) || (LWIP_IPV6 && LWIP_IPV6_FRAG)
+    memp_FRAG_PBUF.base=pvPortMalloc((MEMP_NUM_FRAG_PBUF) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct pbuf_custom_ref))));
+#endif /* LWIP_IPV4 && IP_REASSEMBLY */
+#if LWIP_NETCONN || LWIP_SOCKET
+    memp_NETBUF.base=pvPortMalloc((MEMP_NUM_NETBUF) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct netbuf))));
+    memp_NETCONN.base=pvPortMalloc((MEMP_NUM_NETCONN) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct netconn))));
+#endif /* LWIP_NETCONN || LWIP_SOCKET */
+#if NO_SYS==0
+    memp_TCPIP_MSG_API.base=pvPortMalloc((MEMP_NUM_TCPIP_MSG_API) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct tcpip_msg))));
+#if LWIP_MPU_COMPATIBLE
+    memp_API_MSG.base=pvPortMalloc((MEMP_NUM_API_MSG) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct api_msg))));
+#if LWIP_DNS
+    memp_DNS_API_MSG.base=pvPortMalloc((MEMP_NUM_DNS_API_MSG) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct dns_api_msg))));
+#endif
+#if LWIP_SOCKET && !LWIP_TCPIP_CORE_LOCKING
+    memp_SOCKET_SETGETSOCKOPT_DATA.base=pvPortMalloc((MEMP_NUM_SOCKET_SETGETSOCKOPT_DATA) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct lwip_setgetsockopt_data))));
+#endif
+#if LWIP_SOCKET && (LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL)
+    memp_SELECT_CB.base=pvPortMalloc((MEMP_NUM_SELECT_CB) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct lwip_select_cb))));
+#endif /* LWIP_SOCKET && (LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL) */
+#if LWIP_NETIF_API
+	memp_NETIFAPI_MSG.base=pvPortMalloc((MEMP_NUM_NETIFAPI_MSG) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct netifapi_msg))));
+#endif
+#endif /* LWIP_MPU_COMPATIBLE */
+#if !LWIP_TCPIP_CORE_LOCKING_INPUT
+	memp_TCPIP_MSG_INPKT.base=pvPortMalloc((MEMP_NUM_TCPIP_MSG_INPKT) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct tcpip_msg))));
+#endif /* !LWIP_TCPIP_CORE_LOCKING_INPUT */
+#endif /* NO_SYS==0 */
+#if LWIP_IPV4 && LWIP_ARP && ARP_QUEUEING
+	memp_ARP_QUEUE.base=pvPortMalloc((MEMP_NUM_ARP_QUEUE) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct etharp_q_entry))));
+#endif /* LWIP_IPV4 && LWIP_ARP && ARP_QUEUEING */
+#if LWIP_IGMP
+    memp_IGMP_GROUP.base=pvPortMalloc((MEMP_NUM_IGMP_GROUP) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct igmp_group))));
+#endif /* LWIP_IGMP */
+#if LWIP_TIMERS && !LWIP_TIMERS_CUSTOM
+    memp_SYS_TIMEOUT.base=pvPortMalloc((MEMP_NUM_SYS_TIMEOUT) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct sys_timeo))));
+#endif /* LWIP_TIMERS && !LWIP_TIMERS_CUSTOM */
+#if LWIP_DNS && LWIP_SOCKET
+    memp_NETDB.base=pvPortMalloc((MEMP_NUM_NETDB) * (MEMP_SIZE + MEMP_ALIGN_SIZE(NETDB_ELEM_SIZE)));
+#endif /* LWIP_DNS && LWIP_SOCKET */
+#if LWIP_DNS && DNS_LOCAL_HOSTLIST && DNS_LOCAL_HOSTLIST_IS_DYNAMIC
+    memp_LOCALHOSTLIST.base=pvPortMalloc((MEMP_NUM_LOCALHOSTLIST) * (MEMP_SIZE + MEMP_ALIGN_SIZE(LOCALHOSTLIST_ELEM_SIZE)));
+#endif /* LWIP_DNS && DNS_LOCAL_HOSTLIST && DNS_LOCAL_HOSTLIST_IS_DYNAMIC */
+#if LWIP_IPV6 && LWIP_ND6_QUEUEING
+    memp_ND6_QUEUE.base=pvPortMalloc((MEMP_NUM_ND6_QUEUE) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct nd6_q_entry))));
+#endif /* LWIP_IPV6 && LWIP_ND6_QUEUEING */
+#if LWIP_IPV6 && LWIP_IPV6_REASS
+    memp_IP6_REASSDATA.base=pvPortMalloc((MEMP_NUM_REASSDATA) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct ip6_reassdata))));
+#endif /* LWIP_IPV6 && LWIP_IPV6_REASS */
+
+#if LWIP_IPV6 && LWIP_IPV6_MLD
+    memp_MLD6_GROUP.base=pvPortMalloc((MEMP_NUM_MLD6_GROUP) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct mld_group))));
+#endif /* LWIP_IPV6 && LWIP_IPV6_MLD */
+    memp_PBUF.base=pvPortMalloc((MEMP_NUM_PBUF) * (MEMP_SIZE + MEMP_ALIGN_SIZE(sizeof(struct pbuf))));
+    memp_PBUF_POOL.base=pvPortMalloc((PBUF_POOL_SIZE) * (LWIP_MEM_ALIGN_SIZE(sizeof(struct pbuf)) + LWIP_MEM_ALIGN_SIZE(PBUF_POOL_BUFSIZE)));
+#endif
+#endif //CONFIG_LWIP_HEAP_POOL
+
   /* for every pool: */
   for (i = 0; i < LWIP_ARRAYSIZE(memp_pools); i++) {
     memp_init_pool(memp_pools[i]);

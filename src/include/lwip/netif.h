@@ -324,6 +324,12 @@ struct netif {
 #ifdef netif_get_client_data
   void* client_data[LWIP_NETIF_CLIENT_DATA_INDEX_MAX + LWIP_NUM_NETIF_CLIENT_DATA];
 #endif
+#if NT_FN_DHCPS_V4
+  /* dhcp server pcbs */
+  struct udp_pcb *dhcps_pcb;
+  /* dhcp server status flag */
+  uint8_t dhcps_flag;
+#endif /* NT_FN_DHCPS_V4 */
 #if LWIP_NETIF_HOSTNAME
   /* the hostname for this netif, NULL is a valid value */
   const char*  hostname;
@@ -408,6 +414,30 @@ extern struct netif *netif_list;
 /** The default network interface. */
 extern struct netif *netif_default;
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void netif_init(void);
+
+__attribute__ ((section(".lwip_nc_text"))) struct netif *netif_add_noaddr(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input);
+
+#if LWIP_IPV4
+__attribute__ ((section(".lwip_nc_text"))) struct netif *netif_add(struct netif *netif,
+                            const ip4_addr_t *ipaddr, const ip4_addr_t *netmask, const ip4_addr_t *gw,
+                            void *state, netif_init_fn init, netif_input_fn input);
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_addr(struct netif *netif, const ip4_addr_t *ipaddr, const ip4_addr_t *netmask,
+                    const ip4_addr_t *gw);
+#else /* LWIP_IPV4 */
+struct netif *netif_add(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input);
+#endif /* LWIP_IPV4 */
+__attribute__ ((section(".lwip_nc_text"))) void netif_remove(struct netif * netif);
+
+/* Returns a network interface given its name. The name is of the form
+   "et0", where the first two letters are the "name" field in the
+   netif structure, and the digit is in the num field in the same
+   structure. */
+__attribute__ ((section(".lwip_nc_text"))) struct netif *netif_find(const char *name);
+
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_default(struct netif *netif);
+#else
 void netif_init(void);
 
 struct netif *netif_add_noaddr(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input);
@@ -430,11 +460,18 @@ void netif_remove(struct netif * netif);
 struct netif *netif_find(const char *name);
 
 void netif_set_default(struct netif *netif);
+#endif
 
 #if LWIP_IPV4
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_ipaddr(struct netif *netif, const ip4_addr_t *ipaddr);
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_netmask(struct netif *netif, const ip4_addr_t *netmask);
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_gw(struct netif *netif, const ip4_addr_t *gw);
+#else
 void netif_set_ipaddr(struct netif *netif, const ip4_addr_t *ipaddr);
 void netif_set_netmask(struct netif *netif, const ip4_addr_t *netmask);
 void netif_set_gw(struct netif *netif, const ip4_addr_t *gw);
+#endif
 /** @ingroup netif_ip4 */
 #define netif_ip4_addr(netif)    ((const ip4_addr_t*)ip_2_ip4(&((netif)->ip_addr)))
 /** @ingroup netif_ip4 */
@@ -453,8 +490,13 @@ void netif_set_gw(struct netif *netif, const ip4_addr_t *gw);
 #define netif_clear_flags(netif, clr_flags)   do { (netif)->flags = (u8_t)((netif)->flags & (u8_t)(~(clr_flags) & 0xff)); } while(0)
 #define netif_is_flag_set(nefif, flag)        (((netif)->flags & (flag)) != 0)
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_up(struct netif *netif);
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_down(struct netif *netif);
+#else
 void netif_set_up(struct netif *netif);
 void netif_set_down(struct netif *netif);
+#endif
 /** @ingroup netif
  * Ask if an interface is up
  */
@@ -467,8 +509,13 @@ void netif_set_status_callback(struct netif *netif, netif_status_callback_fn sta
 void netif_set_remove_callback(struct netif *netif, netif_status_callback_fn remove_callback);
 #endif /* LWIP_NETIF_REMOVE_CALLBACK */
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_link_up(struct netif *netif);
+__attribute__ ((section(".lwip_nc_text"))) void netif_set_link_down(struct netif *netif);
+#else
 void netif_set_link_up(struct netif *netif);
 void netif_set_link_down(struct netif *netif);
+#endif
 /** Ask if a link is up */
 #define netif_is_link_up(netif) (((netif)->flags & NETIF_FLAG_LINK_UP) ? (u8_t)1 : (u8_t)0)
 
@@ -504,13 +551,26 @@ void netif_poll_all(void);
 #endif /* !LWIP_NETIF_LOOPBACK_MULTITHREADING */
 #endif /* ENABLE_LOOPBACK */
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) err_t netif_input(struct pbuf *p, struct netif *inp);
+#else
 err_t netif_input(struct pbuf *p, struct netif *inp);
+#endif
 
 #if LWIP_IPV6
 /** @ingroup netif_ip6 */
 #define netif_ip_addr6(netif, i)  ((const ip_addr_t*)(&((netif)->ip6_addr[i])))
 /** @ingroup netif_ip6 */
 #define netif_ip6_addr(netif, i)  ((const ip6_addr_t*)ip_2_ip6(&((netif)->ip6_addr[i])))
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void netif_ip6_addr_set(struct netif *netif, s8_t addr_idx, const ip6_addr_t *addr6);
+__attribute__ ((section(".lwip_nc_text"))) void netif_ip6_addr_set_parts(struct netif *netif, s8_t addr_idx, u32_t i0, u32_t i1, u32_t i2, u32_t i3);
+#define netif_ip6_addr_state(netif, i)  ((netif)->ip6_addr_state[i])
+__attribute__ ((section(".lwip_nc_text"))) void netif_ip6_addr_set_state(struct netif* netif, s8_t addr_idx, u8_t state);
+s8_t netif_get_ip6_addr_match(struct netif *netif, const ip6_addr_t *ip6addr);
+__attribute__ ((section(".lwip_nc_text"))) void netif_create_ip6_linklocal_address(struct netif *netif, u8_t from_mac_48bit);
+__attribute__ ((section(".lwip_nc_text"))) err_t netif_add_ip6_address(struct netif *netif, const ip6_addr_t *ip6addr, s8_t *chosen_idx);
+#else
 void netif_ip6_addr_set(struct netif *netif, s8_t addr_idx, const ip6_addr_t *addr6);
 void netif_ip6_addr_set_parts(struct netif *netif, s8_t addr_idx, u32_t i0, u32_t i1, u32_t i2, u32_t i3);
 #define netif_ip6_addr_state(netif, i)  ((netif)->ip6_addr_state[i])
@@ -518,6 +578,7 @@ void netif_ip6_addr_set_state(struct netif* netif, s8_t addr_idx, u8_t state);
 s8_t netif_get_ip6_addr_match(struct netif *netif, const ip6_addr_t *ip6addr);
 void netif_create_ip6_linklocal_address(struct netif *netif, u8_t from_mac_48bit);
 err_t netif_add_ip6_address(struct netif *netif, const ip6_addr_t *ip6addr, s8_t *chosen_idx);
+#endif
 #define netif_set_ip6_autoconfig_enabled(netif, action) do { if(netif) { (netif)->ip6_autoconfig_enabled = (action); }}while(0)
 #if LWIP_IPV6_ADDRESS_LIFETIMES
 #define netif_ip6_addr_valid_life(netif, i)  \
@@ -548,9 +609,15 @@ err_t netif_add_ip6_address(struct netif *netif, const ip6_addr_t *ip6addr, s8_t
 #define NETIF_RESET_HINTS(netif)
 #endif /* LWIP_NETIF_USE_HINTS */
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) u8_t netif_name_to_index(const char *name);
+__attribute__ ((section(".lwip_nc_text"))) char * netif_index_to_name(u8_t idx, char *name);
+__attribute__ ((section(".lwip_nc_text"))) struct netif* netif_get_by_index(u8_t idx);
+#else
 u8_t netif_name_to_index(const char *name);
 char * netif_index_to_name(u8_t idx, char *name);
 struct netif* netif_get_by_index(u8_t idx);
+#endif
 
 /* Interface indexes always start at 1 per RFC 3493, section 4, num starts at 0 (internal index is 0..254)*/
 #define netif_get_index(netif)      ((u8_t)((netif)->num + 1))

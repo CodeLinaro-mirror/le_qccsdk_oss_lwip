@@ -49,7 +49,11 @@
 #include "lwip/pbuf.h"
 #include "lwip/etharp.h"
 #include "netif/ethernet.h"
+#include "wlan_dev.h"
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static void pbuf_free_int(void *p);
+#endif
 #define TCPIP_MSG_VAR_REF(name)     API_VAR_REF(name)
 #define TCPIP_MSG_VAR_DECLARE(name) API_VAR_DECLARE(struct tcpip_msg, name)
 #define TCPIP_MSG_VAR_ALLOC(name)   API_VAR_ALLOC(struct tcpip_msg, MEMP_TCPIP_MSG_API, name, ERR_MEM)
@@ -171,6 +175,13 @@ tcpip_thread_handle_msg(struct tcpip_msg *msg)
 #if !LWIP_TCPIP_CORE_LOCKING_INPUT
     case TCPIP_MSG_INPKT:
       LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_thread: PACKET %p\n", (void *)msg));
+#ifdef NT_TST_TIME_STAMP_ENABLE
+		if ((nt_dpm_tm.rx_stat[LWIP_INPKT].valid == 0) && (*(uint32_t *)((uint8_t *)msg->msg.inp.p->payload + nt_dpm_tm.rx_stat[RX_INTERRUPT].offset) == nt_dpm_tm.rx_marker)) {
+			nt_dpm_tm.rx_stat[LWIP_INPKT].value = nt_hal_get_curr_time();
+			nt_dpm_tm.rx_stat[LWIP_INPKT].valid = 1;
+		}
+#endif
+
       if (msg->msg.inp.input_fn(msg->msg.inp.p, msg->msg.inp.netif) != ERR_OK) {
         pbuf_free(msg->msg.inp.p);
       }
@@ -601,8 +612,9 @@ tcpip_callbackmsg_trycallback_fromisr(struct tcpip_callback_msg *msg)
 void
 tcpip_init(tcpip_init_done_fn initfunc, void *arg)
 {
+	WLAN_DBG0_PRINT("tcp_ip_init");
   lwip_init();
-
+  WLAN_DBG0_PRINT("lwip init done");
   tcpip_init_done = initfunc;
   tcpip_init_done_arg = arg;
   if (sys_mbox_new(&tcpip_mbox, TCPIP_MBOX_SIZE) != ERR_OK) {

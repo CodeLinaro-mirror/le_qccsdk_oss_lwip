@@ -236,9 +236,15 @@ extern const ip_addr_t ip_addr_any_type;
 #define ip_addr_debug_print_val(debug, ipaddr) do { if(IP_IS_V6_VAL(ipaddr)) { \
   ip6_addr_debug_print_val(debug, *ip_2_ip6(&(ipaddr))); } else { \
   ip4_addr_debug_print_val(debug, *ip_2_ip4(&(ipaddr))); }}while(0)
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".perf_nc_txt"))) char *ipaddr_ntoa(const ip_addr_t *addr);
+__attribute__ ((section(".perf_nc_txt"))) char *ipaddr_ntoa_r(const ip_addr_t *addr, char *buf, int buflen);
+__attribute__ ((section(".perf_nc_txt"))) int ipaddr_aton(const char *cp, ip_addr_t *addr);
+#else
 char *ipaddr_ntoa(const ip_addr_t *addr);
 char *ipaddr_ntoa_r(const ip_addr_t *addr, char *buf, int buflen);
 int ipaddr_aton(const char *cp, ip_addr_t *addr);
+#endif
 
 /** @ingroup ipaddr */
 #define IPADDR_STRLEN_MAX   IP6ADDR_STRLEN_MAX

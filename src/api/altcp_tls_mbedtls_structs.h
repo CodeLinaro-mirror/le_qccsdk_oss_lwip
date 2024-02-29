@@ -1,11 +1,12 @@
 /**
  * @file
- * Base TCP API definitions shared by TCP and ALTCP\n
- * See also @ref tcp_raw
+ * Application layered TCP/TLS connection API (to be used from TCPIP thread)
+ *
+ * This file contains structure definitions for a TLS layer using mbedTLS.
  */
 
 /*
- * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
+ * Copyright (c) 2017 Simon Goldschmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -32,61 +33,61 @@
  *
  * This file is part of the lwIP TCP/IP stack.
  *
- * Author: Adam Dunkels <adam@sics.se>
+ * Author: Simon Goldschmidt <goldsimon@gmx.de>
  *
  */
-#ifndef LWIP_HDR_TCPBASE_H
-#define LWIP_HDR_TCPBASE_H
+#ifndef LWIP_HDR_ALTCP_MBEDTLS_STRUCTS_H
+#define LWIP_HDR_ALTCP_MBEDTLS_STRUCTS_H
 
 #include "lwip/opt.h"
 
-#if LWIP_TCP /* don't build if not configured for use in lwipopts.h */
+#if LWIP_ALTCP /* don't build if not configured for use in lwipopts.h */
+
+#include "lwip/apps/altcp_tls_mbedtls_opts.h"
+
+#if LWIP_ALTCP_TLS && LWIP_ALTCP_TLS_MBEDTLS
+
+#include "lwip/altcp.h"
+#include "lwip/pbuf.h"
+
+#include "mbedtls/ssl.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define ALTCP_MBEDTLS_FLAGS_HANDSHAKE_DONE    0x01
+#define ALTCP_MBEDTLS_FLAGS_UPPER_CALLED      0x02
+#define ALTCP_MBEDTLS_FLAGS_RX_CLOSE_QUEUED   0x04
+#define ALTCP_MBEDTLS_FLAGS_RX_CLOSED         0x08
 
-#if LWIP_WND_SCALE
-typedef u32_t tcpwnd_size_t;
-#else
-typedef u16_t tcpwnd_size_t;
-#endif
-
-enum tcp_state {
-  CLOSED      = 0,
-  LISTEN      = 1,
-  SYN_SENT    = 2,
-  SYN_RCVD    = 3,
-  ESTABLISHED = 4,
-  FIN_WAIT_1  = 5,
-  FIN_WAIT_2  = 6,
-  CLOSE_WAIT  = 7,
-  CLOSING     = 8,
-  LAST_ACK    = 9,
-  TIME_WAIT   = 10
-};
-/* ATTENTION: this depends on state number ordering! */
-#define TCP_STATE_IS_CLOSING(state) ((state) >= FIN_WAIT_1)
-
-/* Flags for "apiflags" parameter in tcp_write */
-#define TCP_WRITE_FLAG_COPY 0x01
-#define TCP_WRITE_FLAG_MORE 0x02
-
-#define TCP_PRIO_MIN    1
-#define TCP_PRIO_NORMAL 64
-#define TCP_PRIO_MAX    127
-
-#ifdef NT_FN_RRAM_PERF_BUILD
-__attribute__ ((section(".lwip_nc_text"))) const char* tcp_debug_state_str(enum tcp_state s);
-#else
-const char* tcp_debug_state_str(enum tcp_state s);
-#endif
+typedef struct altcp_mbedtls_state_s {
+  void *conf;
+  mbedtls_ssl_context ssl_context;
+  /* chain of rx pbufs (before decryption) */
+  struct pbuf *rx;
+  struct pbuf *rx_app;
+  u8_t flags;
+  int rx_passed_unrecved;
+  int bio_bytes_read;
+  int bio_bytes_appl;
+  int overhead_bytes_adjust;
+} altcp_mbedtls_state_t;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* LWIP_TCP */
+#ifndef ALTCP_MBEDTLS_RNG_FN
+#define ALTCP_MBEDTLS_RNG_FN		mbedtls_entropy_func
+#endif
 
-#endif /* LWIP_HDR_TCPBASE_H */
+#ifndef ALTCP_MBEDTLS_ENTROPY_PTR
+#define ALTCP_MBEDTLS_ENTROPY_PTR   "Neutrino_IOT_Module"
+#endif
+#ifndef ALTCP_MBEDTLS_ENTROPY_LEN
+#define ALTCP_MBEDTLS_ENTROPY_LEN   sizeof(ALTCP_MBEDTLS_ENTROPY_PTR)
+#endif
+#endif /* LWIP_ALTCP_TLS && LWIP_ALTCP_TLS_MBEDTLS */
+#endif /* LWIP_ALTCP */
+#endif /* LWIP_HDR_ALTCP_MBEDTLS_STRUCTS_H */

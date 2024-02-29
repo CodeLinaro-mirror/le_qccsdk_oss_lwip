@@ -94,7 +94,11 @@ struct netif;
 #define API_MSG_M_DEF_C(t, m)           const t * m
 #endif /* LWIP_MPU_COMPATIBLE */
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) err_t tcpip_send_msg_wait_sem(tcpip_callback_fn fn, void *apimsg, sys_sem_t* sem);
+#else
 err_t tcpip_send_msg_wait_sem(tcpip_callback_fn fn, void *apimsg, sys_sem_t* sem);
+#endif
 
 struct tcpip_api_call_data
 {
@@ -108,7 +112,11 @@ struct tcpip_api_call_data
 #endif /* !LWIP_TCPIP_CORE_LOCKING */
 };
 typedef err_t (*tcpip_api_call_fn)(struct tcpip_api_call_data* call);
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) err_t tcpip_api_call(tcpip_api_call_fn fn, struct tcpip_api_call_data *call);
+#else
 err_t tcpip_api_call(tcpip_api_call_fn fn, struct tcpip_api_call_data *call);
+#endif
 
 enum tcpip_msg_type {
 #if !LWIP_TCPIP_CORE_LOCKING

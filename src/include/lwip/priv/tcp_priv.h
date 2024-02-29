@@ -57,6 +57,38 @@ extern "C" {
 
 /* Functions for interfacing with TCP: */
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+/* Lower layer interface to TCP: */
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_init    (void);  /* Initialize this module. */
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_tmr     (void);  /* Must be called every
+                                         TCP_TMR_INTERVAL
+                                         ms. (Typically 250 ms). */
+/* It is also possible to call these two functions at the right
+   intervals (instead of calling tcp_tmr()). */
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_slowtmr (void);
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_fasttmr (void);
+
+/* Call this from a netif driver (watch out for threading issues!) that has
+   returned a memory error on transmit and now has free buffers to send more.
+   This iterates all active pcbs that had an error and tries to call
+   tcp_output, so use this with care as it might slow down the system. */
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_txnow   (void);
+
+/* Only used by IP to pass a TCP segment to TCP: */
+void             tcp_input   (struct pbuf *p, struct netif *inp);
+/* Used within the TCP code only: */
+__attribute__ ((section(".lwip_nc_text"))) struct tcp_pcb * tcp_alloc   (u8_t prio);
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_free    (struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_abandon (struct tcp_pcb *pcb, int reset);
+__attribute__ ((section(".lwip_nc_text"))) err_t            tcp_send_empty_ack(struct tcp_pcb *pcb);
+err_t            tcp_rexmit  (struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) err_t            tcp_rexmit_rto_prepare(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_rexmit_rto_commit(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_rexmit_rto  (struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void             tcp_rexmit_fast (struct tcp_pcb *pcb);
+u32_t            tcp_update_rcv_ann_wnd(struct tcp_pcb *pcb);
+err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
+#else
 /* Lower layer interface to TCP: */
 void             tcp_init    (void);  /* Initialize this module. */
 void             tcp_tmr     (void);  /* Must be called every
@@ -88,6 +120,7 @@ void             tcp_rexmit_fast (struct tcp_pcb *pcb);
 u32_t            tcp_update_rcv_ann_wnd(struct tcp_pcb *pcb);
 err_t            tcp_process_refused_data(struct tcp_pcb *pcb);
 
+#endif
 /**
  * This is the Nagle algorithm: try to combine user data to send as few TCP
  * segments as possible. Only send if
@@ -438,10 +471,17 @@ extern struct tcp_pcb ** const tcp_pcb_lists[NUM_TCP_PCB_LISTS];
 
 /* Internal functions: */
 struct tcp_pcb *tcp_pcb_copy(struct tcp_pcb *pcb);
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void tcp_pcb_purge(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void tcp_pcb_remove(struct tcp_pcb **pcblist, struct tcp_pcb *pcb);
+
+__attribute__ ((section(".lwip_nc_text"))) void tcp_segs_free(struct tcp_seg *seg);
+#else
 void tcp_pcb_purge(struct tcp_pcb *pcb);
 void tcp_pcb_remove(struct tcp_pcb **pcblist, struct tcp_pcb *pcb);
 
 void tcp_segs_free(struct tcp_seg *seg);
+#endif
 void tcp_seg_free(struct tcp_seg *seg);
 struct tcp_seg *tcp_seg_copy(struct tcp_seg *seg);
 
@@ -459,6 +499,23 @@ struct tcp_seg *tcp_seg_copy(struct tcp_seg *seg);
 #define tcp_ack_now(pcb)                           \
   tcp_set_flags(pcb, TF_ACK_NOW)
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) err_t tcp_send_fin(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) err_t tcp_enqueue_flags(struct tcp_pcb *pcb, u8_t flags);
+
+void tcp_rexmit_seg(struct tcp_pcb *pcb, struct tcp_seg *seg);
+
+__attribute__ ((section(".lwip_nc_text"))) void tcp_rst(const struct tcp_pcb* pcb, u32_t seqno, u32_t ackno,
+       const ip_addr_t *local_ip, const ip_addr_t *remote_ip,
+       u16_t local_port, u16_t remote_port);
+
+__attribute__ ((section(".lwip_nc_text"))) u32_t tcp_next_iss(struct tcp_pcb *pcb);
+
+__attribute__ ((section(".lwip_nc_text"))) err_t tcp_keepalive(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) err_t tcp_split_unsent_seg(struct tcp_pcb *pcb, u16_t split);
+err_t tcp_zero_window_probe(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) void  tcp_trigger_input_pcb_close(void);
+#else
 err_t tcp_send_fin(struct tcp_pcb *pcb);
 err_t tcp_enqueue_flags(struct tcp_pcb *pcb, u8_t flags);
 
@@ -474,6 +531,7 @@ err_t tcp_keepalive(struct tcp_pcb *pcb);
 err_t tcp_split_unsent_seg(struct tcp_pcb *pcb, u16_t split);
 err_t tcp_zero_window_probe(struct tcp_pcb *pcb);
 void  tcp_trigger_input_pcb_close(void);
+#endif
 
 #if TCP_CALCULATE_EFF_SEND_MSS
 u16_t tcp_eff_send_mss_netif(u16_t sendmss, struct netif *outif,
@@ -483,7 +541,11 @@ u16_t tcp_eff_send_mss_netif(u16_t sendmss, struct netif *outif,
 #endif /* TCP_CALCULATE_EFF_SEND_MSS */
 
 #if LWIP_CALLBACK_API
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) err_t tcp_recv_null(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err);
+#else
 err_t tcp_recv_null(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err);
+#endif
 #endif /* LWIP_CALLBACK_API */
 
 #if TCP_DEBUG || TCP_INPUT_DEBUG || TCP_OUTPUT_DEBUG
@@ -502,9 +564,15 @@ s16_t tcp_pcbs_sane(void);
 
 /** External function (implemented in timers.c), called when TCP detects
  * that a timer is needed (i.e. active- or time-wait-pcb found). */
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void tcp_timer_needed(void);
+
+__attribute__ ((section(".lwip_nc_text"))) void tcp_netif_ip_addr_changed(const ip_addr_t* old_addr, const ip_addr_t* new_addr);
+#else
 void tcp_timer_needed(void);
 
 void tcp_netif_ip_addr_changed(const ip_addr_t* old_addr, const ip_addr_t* new_addr);
+#endif
 
 #if TCP_QUEUE_OOSEQ
 void tcp_free_ooseq(struct tcp_pcb *pcb);

@@ -87,6 +87,11 @@ static struct pbuf *recv_data;
 
 struct tcp_pcb *tcp_input_pcb;
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static int tcp_input_delayed_close(struct tcp_pcb *pcb);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_listen_input(struct tcp_pcb_listen *pcb);
+__attribute__ ((section(".lwip_nc_text"))) static void tcp_timewait_input(struct tcp_pcb *pcb);
+#endif
 /* Forward declarations. */
 static err_t tcp_process(struct tcp_pcb *pcb);
 static void tcp_receive(struct tcp_pcb *pcb);

@@ -57,6 +57,7 @@
  */
 
 #include "lwip/opt.h"
+#include "safeAPI.h"
 
 #if LWIP_IPV4 && LWIP_AUTOIP /* don't build if not configured for use in lwipopts.h */
 

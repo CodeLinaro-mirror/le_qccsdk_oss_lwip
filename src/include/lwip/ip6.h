@@ -71,7 +71,11 @@ err_t         ip6_output_hinted(struct pbuf *p, const ip6_addr_t *src, const ip6
                                 u8_t hl, u8_t tc, u8_t nexth, struct netif_hint *netif_hint);
 #endif /* LWIP_NETIF_USE_HINTS */
 #if LWIP_IPV6_MLD
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) err_t         ip6_options_add_hbh_ra(struct pbuf * p, u8_t nexth, u8_t value);
+#else
 err_t         ip6_options_add_hbh_ra(struct pbuf * p, u8_t nexth, u8_t value);
+#endif
 #endif /* LWIP_IPV6_MLD */
 
 #define ip6_netif_get_local_ip(netif, dest) (((netif) != NULL) ? \

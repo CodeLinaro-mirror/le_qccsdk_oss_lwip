@@ -74,6 +74,28 @@ typedef void (*tcpip_callback_fn)(void *ctx);
 /* Forward declarations */
 struct tcpip_callback_msg;
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void   tcpip_init(tcpip_init_done_fn tcpip_init_done, void *arg);
+
+err_t  tcpip_inpkt(struct pbuf *p, struct netif *inp, netif_input_fn input_fn);
+err_t  tcpip_input(struct pbuf *p, struct netif *inp);
+
+__attribute__ ((section(".lwip_nc_text"))) err_t  tcpip_try_callback(tcpip_callback_fn function, void *ctx);
+__attribute__ ((section(".lwip_nc_text"))) err_t  tcpip_callback(tcpip_callback_fn function, void *ctx);
+/**  @ingroup lwip_os
+ * @deprecated use tcpip_try_callback() or tcpip_callback() instead
+ */
+#define tcpip_callback_with_block(function, ctx, block) ((block != 0)? tcpip_callback(function, ctx) : tcpip_try_callback(function, ctx))
+
+__attribute__ ((section(".lwip_nc_text"))) struct tcpip_callback_msg* tcpip_callbackmsg_new(tcpip_callback_fn function, void *ctx);
+__attribute__ ((section(".lwip_nc_text"))) void   tcpip_callbackmsg_delete(struct tcpip_callback_msg* msg);
+__attribute__ ((section(".lwip_nc_text"))) err_t  tcpip_callbackmsg_trycallback(struct tcpip_callback_msg* msg);
+err_t  tcpip_callbackmsg_trycallback_fromisr(struct tcpip_callback_msg* msg);
+
+/* free pbufs or heap memory from another context without blocking */
+__attribute__ ((section(".lwip_nc_text"))) err_t  pbuf_free_callback(struct pbuf *p);
+__attribute__ ((section(".lwip_nc_text"))) err_t  mem_free_callback(void *m);
+#else
 void   tcpip_init(tcpip_init_done_fn tcpip_init_done, void *arg);
 
 err_t  tcpip_inpkt(struct pbuf *p, struct netif *inp, netif_input_fn input_fn);
@@ -94,6 +116,7 @@ err_t  tcpip_callbackmsg_trycallback_fromisr(struct tcpip_callback_msg* msg);
 /* free pbufs or heap memory from another context without blocking */
 err_t  pbuf_free_callback(struct pbuf *p);
 err_t  mem_free_callback(void *m);
+#endif
 
 #if LWIP_TCPIP_TIMEOUT && LWIP_TIMERS
 err_t  tcpip_timeout(u32_t msecs, sys_timeout_handler h, void *arg);

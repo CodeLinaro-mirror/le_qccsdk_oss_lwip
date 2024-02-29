@@ -120,6 +120,7 @@ const int lwip_num_cyclic_timers = LWIP_ARRAYSIZE(lwip_cyclic_timers);
 
 /** The one and only timeout list */
 static struct sys_timeo *next_timeout;
+static u32_t pause_all_system_timeouts = 0;
 
 static u32_t current_timeout_due_time;
 
@@ -238,6 +239,11 @@ lwip_cyclic_timer(void *arg)
 #if LWIP_DEBUG_TIMERNAMES
   LWIP_DEBUGF(TIMERS_DEBUG, ("tcpip: %s()\n", cyclic->handler_name));
 #endif
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+  if(lwip_check_timer_needed(arg) == 0) {
+	  return;
+  }
+#endif
   cyclic->handler();
 
   now = sys_now();
@@ -264,6 +270,10 @@ lwip_cyclic_timer(void *arg)
 void sys_timeouts_init(void)
 {
   size_t i;
+#if LWIP_TCP
+  tcp_timer_needed();
+#endif
+
   /* tcp_tmr() at index 0 is started on demand */
   for (i = (LWIP_TCP ? 1 : 0); i < LWIP_ARRAYSIZE(lwip_cyclic_timers); i++) {
     /* we have to cast via size_t to get rid of const warning
@@ -428,7 +438,12 @@ sys_timeouts_sleeptime(void)
   u32_t now;
 
   LWIP_ASSERT_CORE_LOCKED();
-
+ 
+  /* If Paused, sleep until they are resumed */
+  if(pause_all_system_timeouts) {
+    return SYS_TIMEOUTS_SLEEPTIME_INFINITE;
+  }
+  
   if (next_timeout == NULL) {
     return SYS_TIMEOUTS_SLEEPTIME_INFINITE;
   }
@@ -440,6 +455,89 @@ sys_timeouts_sleeptime(void)
     LWIP_ASSERT("invalid sleeptime", ret <= LWIP_MAX_TIMEOUT);
     return ret;
   }
+}
+
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+void
+lwip_start_timer(void *arg)
+{
+	lwip_cyclic_timer_handler handler = (lwip_cyclic_timer_handler)arg;
+	size_t i;
+	struct sys_timeo *t;
+
+	for (i = (LWIP_TCP ? 1 : 0); i < LWIP_ARRAYSIZE(lwip_cyclic_timers); i++) {
+		if (lwip_cyclic_timers[i].handler == handler) {
+			for (t = next_timeout; t != NULL; t = t->next) {
+				if (t->arg == LWIP_CONST_CAST(void *, &lwip_cyclic_timers[i])) {
+					return;
+				}
+			}
+
+			sys_timeout(lwip_cyclic_timers[i].interval_ms, lwip_cyclic_timer, LWIP_CONST_CAST(void *, &lwip_cyclic_timers[i]));
+			return;
+		}
+	}
+}
+
+int
+lwip_check_timer_needed(void *arg)
+{
+  const struct lwip_cyclic_timer *cyclic = (const struct lwip_cyclic_timer *)arg;
+
+#if LWIP_IPV4
+#if IP_REASSEMBLY
+  if (cyclic->handler == HANDLER(ip_reass_tmr)) {
+	  return ip_reass_tmr_needed();
+  } else
+#endif
+#if LWIP_ARP
+  if (cyclic->handler == HANDLER(etharp_tmr)) {
+	  return etharp_tmr_needed();
+  } else
+#endif
+#if LWIP_DHCP
+  if ((cyclic->handler == HANDLER(dhcp_coarse_tmr)) || (cyclic->handler == HANDLER(dhcp_fine_tmr))) {
+	  return dhcp_tmr_needed();
+  } else
+#endif
+#if LWIP_IGMP
+  if (cyclic->handler == HANDLER(igmp_tmr)) {
+	  return igmp_tmr_needed();
+  } else
+#endif
+#endif /* LWIP_IPV4 */
+#if LWIP_DNS
+  if (cyclic->handler == HANDLER(dns_tmr)) {
+	  return dns_tmr_needed();
+  } else
+#endif
+	  return 1;
+}
+#endif
+
+void sys_timeouts_deinit(void)
+{
+  size_t i;
+  for (i = (LWIP_TCP ? 1 : 0); i < LWIP_ARRAYSIZE(lwip_cyclic_timers); i++) {
+    sys_untimeout(lwip_cyclic_timer, LWIP_CONST_CAST(void *, &lwip_cyclic_timers[i]));
+  }
+#if LWIP_TCP
+  sys_untimeout(tcpip_tcp_timer, NULL);
+  tcpip_tcp_timer_active = 0;
+#endif
+}
+
+/* Pauses the timer linked list so that no timers fired during sleep */
+void sys_timeouts_pause_all(void)
+{
+    pause_all_system_timeouts = 1;
+}
+
+/* Resumes the timer linked list and checks for expired timers */
+void sys_timeouts_unpause_all(void)
+{
+    pause_all_system_timeouts = 0;
+    sys_check_timeouts();
 }
 
 #else /* LWIP_TIMERS && !LWIP_TIMERS_CUSTOM */

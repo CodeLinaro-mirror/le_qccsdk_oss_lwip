@@ -46,6 +46,7 @@ extern "C" {
 #if MEM_LIBC_MALLOC
 
 #include "lwip/arch.h"
+#include "nt_osal.h"
 
 typedef size_t mem_size_t;
 #define MEM_SIZE_F SZT_F
@@ -69,12 +70,23 @@ typedef u16_t mem_size_t;
 #endif /* MEM_SIZE > 64000 */
 #endif
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void  mem_init(void);
+#else
 void  mem_init(void);
+#endif
 void *mem_trim(void *mem, mem_size_t size);
 void *mem_malloc(mem_size_t size);
 void *mem_calloc(mem_size_t count, mem_size_t size);
 void  mem_free(void *mem);
 
+#ifdef NT_FN_DPM_DEBUG
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void dump_lwip_mem();
+#else
+void dump_lwip_mem();
+#endif
+#endif
 #ifdef __cplusplus
 }
 #endif

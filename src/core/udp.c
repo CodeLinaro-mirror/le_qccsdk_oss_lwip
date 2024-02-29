@@ -65,6 +65,9 @@
 
 #include <string.h>
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static u16_t udp_new_port(void);
+#endif
 #ifndef UDP_LOCAL_PORT_RANGE_START
 /* From http://www.iana.org/assignments/port-numbers:
    "The Dynamic and/or Private Ports are those from 49152 through 65535" */

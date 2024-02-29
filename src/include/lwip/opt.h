@@ -50,7 +50,6 @@
  */
 #include "lwipopts.h"
 #include "lwip/debug.h"
-
 /**
  * @defgroup lwip_opts Options (lwipopts.h)
  * @ingroup lwip
@@ -134,7 +133,11 @@
  * one included in your C library
  */
 #if !defined MEMCPY || defined __DOXYGEN__
-#define MEMCPY(dst,src,len)             memcpy(dst,src,len)
+#ifdef MEM_CPY_VIA_DXE
+#define MEMCPY(dst,src,len)             nt_dpm_memcpy(dst,src,len)
+#else
+#define MEMCPY(dst,src,len)             memscpy(dst,len,src,len)
+#endif /* MEM_CPY_VIA_DXE */
 #endif
 
 /**
@@ -142,7 +145,7 @@
  * call to memcpy() if the length is known at compile time and is small.
  */
 #if !defined SMEMCPY || defined __DOXYGEN__
-#define SMEMCPY(dst,src,len)            memcpy(dst,src,len)
+#define SMEMCPY(dst,src,len)            memscpy(dst,len,src,len)
 #endif
 
 /**
@@ -151,7 +154,7 @@
  * fragmentation support is enabled.
  */
 #if !defined MEMMOVE || defined __DOXYGEN__
-#define MEMMOVE(dst,src,len)            memmove(dst,src,len)
+#define MEMMOVE(dst,src,len)            memsmove(dst,len,src,len)
 #endif
 /**
  * @}
@@ -255,7 +258,11 @@
  * already use it.
  */
 #if !defined MEM_LIBC_MALLOC || defined __DOXYGEN__
+#ifdef CONFIG_LWIP_HEAP_POOL
 #define MEM_LIBC_MALLOC                 0
+#else
+#define MEM_LIBC_MALLOC                 1
+#endif
 #endif
 
 /**
@@ -268,7 +275,11 @@
  * not only for internal pools defined in memp_std.h)!
  */
 #if !defined MEMP_MEM_MALLOC || defined __DOXYGEN__
+#ifdef CONFIG_LWIP_HEAP_POOL
 #define MEMP_MEM_MALLOC                 0
+#else
+#define MEMP_MEM_MALLOC                 1
+#endif
 #endif
 
 /**
@@ -386,7 +397,7 @@
  * - mem_free_callback(m);
  */
 #if !defined LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT || defined __DOXYGEN__
-#define LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT 0
+#define LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT 1
 #endif
 /**
  * @}
@@ -556,7 +567,7 @@
  * (only needed if you use tcpip.c)
  */
 #if !defined MEMP_NUM_TCPIP_MSG_INPKT || defined __DOXYGEN__
-#define MEMP_NUM_TCPIP_MSG_INPKT        8
+#define MEMP_NUM_TCPIP_MSG_INPKT        20
 #endif
 
 /**
@@ -638,10 +649,10 @@
 
 /** the time an ARP entry stays valid after its last update,
  *  for ARP_TMR_INTERVAL = 1000, this is
- *  (60 * 5) seconds = 5 minutes.
+ *  (60 * 30) seconds = 30 minutes.
  */
 #if !defined ARP_MAXAGE || defined __DOXYGEN__
-#define ARP_MAXAGE                      300
+#define ARP_MAXAGE                      1800
 #endif
 
 /**
@@ -1614,7 +1625,7 @@
  * whenever the link changes (i.e., link down)
  */
 #if !defined LWIP_NETIF_LINK_CALLBACK || defined __DOXYGEN__
-#define LWIP_NETIF_LINK_CALLBACK        0
+#define LWIP_NETIF_LINK_CALLBACK        1
 #endif
 
 /**
@@ -1700,7 +1711,7 @@
  * address equal to the netif IP address, looping them back up the stack.
  */
 #if !defined LWIP_NETIF_LOOPBACK || defined __DOXYGEN__
-#define LWIP_NETIF_LOOPBACK             0
+#define LWIP_NETIF_LOOPBACK             1
 #endif
 
 /**
@@ -1958,7 +1969,7 @@
  * names (read, write & close). (only used if you use sockets.c)
  */
 #if !defined LWIP_POSIX_SOCKETS_IO_NAMES || defined __DOXYGEN__
-#define LWIP_POSIX_SOCKETS_IO_NAMES     1
+#define LWIP_POSIX_SOCKETS_IO_NAMES     0
 #endif
 
 /**
@@ -2737,9 +2748,13 @@
  * Declare your hook function prototypes in there, you may also \#include all headers
  * providing data types that are need in this file.
  */
+#ifdef SUPPORT_RING_IF
+#define LWIP_HOOK_FILENAME "data_svc_internal_api.h"
+#else
 #ifdef __DOXYGEN__
 #define LWIP_HOOK_FILENAME "path/to/my/lwip_hooks.h"
 #endif
+#endif /* SUPPORT_RING_IF */
 
 /**
  * LWIP_HOOK_TCP_ISN:
@@ -3063,9 +3078,15 @@
  *
  * Payload points to ethernet header!
  */
+#ifdef SUPPORT_RING_IF 
+#define LWIP_HOOK_UNKNOWN_ETH_PROTOCOL(pbuf, netif) data_svc_recv_raweth_data_pkt(pbuf,netif)
+#else
 #ifdef __DOXYGEN__
 #define LWIP_HOOK_UNKNOWN_ETH_PROTOCOL(pbuf, netif)
 #endif
+#endif /* SUPPORT_RING_IF */
+
+
 
 /**
  * LWIP_HOOK_DHCP_APPEND_OPTIONS(netif, dhcp, state, msg, msg_type, options_len_ptr):

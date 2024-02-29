@@ -128,6 +128,24 @@ u32_t lwip_htonl(u32_t x);
  * in your application, too.
  */
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+#ifndef lwip_itoa
+/* This can be #defined to itoa() or snprintf(result, bufsize, "%d", number) depending on your platform */
+__attribute__ ((section(".lwip_nc_text"))) void  lwip_itoa(char* result, size_t bufsize, int number);
+#endif
+#ifndef lwip_strnicmp
+/* This can be #defined to strnicmp() or strncasecmp() depending on your platform */
+__attribute__ ((section(".lwip_nc_text"))) int   lwip_strnicmp(const char* str1, const char* str2, size_t len);
+#endif
+#ifndef lwip_stricmp
+/* This can be #defined to stricmp() or strcasecmp() depending on your platform */
+__attribute__ ((section(".lwip_nc_text"))) int   lwip_stricmp(const char* str1, const char* str2);
+#endif
+#ifndef lwip_strnstr
+/* This can be #defined to strnstr() depending on your platform */
+__attribute__ ((section(".lwip_nc_text"))) char* lwip_strnstr(const char* buffer, const char* token, size_t n);
+#endif
+#else
 #ifndef lwip_itoa
 /* This can be #defined to itoa() or snprintf(result, bufsize, "%d", number) depending on your platform */
 void  lwip_itoa(char* result, size_t bufsize, int number);
@@ -143,6 +161,7 @@ int   lwip_stricmp(const char* str1, const char* str2);
 #ifndef lwip_strnstr
 /* This can be #defined to strnstr() depending on your platform */
 char* lwip_strnstr(const char* buffer, const char* token, size_t n);
+#endif
 #endif
 
 #ifdef __cplusplus

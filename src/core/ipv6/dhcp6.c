@@ -64,6 +64,9 @@
 #include "lwip/def.h"
 #include "lwip/udp.h"
 #include "lwip/dns.h"
+#ifdef SUPPORT_COEX
+#include "wlan_wmi.h"
+#endif
 
 #include <string.h>
 
@@ -458,6 +461,9 @@ dhcp6_information_request(struct netif *netif, struct dhcp6 *dhcp6)
   LWIP_DEBUGF(DHCP6_DEBUG | LWIP_DBG_TRACE, ("dhcp6_information_request()\n"));
   /* create and initialize the DHCP message header */
   p_out = dhcp6_create_msg(netif, dhcp6, DHCP6_INFOREQUEST, 4 + sizeof(requested_options), &options_out_len);
+#ifdef SUPPORT_COEX
+  post_message_to_nt_wlan(WMI_COEX_CRIT_PROTO_START, NULL);
+#endif
   if (p_out != NULL) {
     err_t err;
     struct dhcp6_msg *msg_out = (struct dhcp6_msg *)p_out->payload;
@@ -738,6 +744,9 @@ dhcp6_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr
   /* message type is DHCP6 REPLY? */
   if (msg_type == DHCP6_REPLY) {
     LWIP_DEBUGF(DHCP6_DEBUG | LWIP_DBG_TRACE, ("DHCP6_REPLY received\n"));
+#ifdef SUPPORT_COEX
+  post_message_to_nt_wlan(WMI_COEX_CRIT_PROTO_STOP, NULL);
+#endif
 #if LWIP_IPV6_DHCP6_STATELESS
     /* in info-requesting state? */
     if (dhcp6->state == DHCP6_STATE_REQUESTING_CONFIG) {

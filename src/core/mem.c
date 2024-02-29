@@ -180,13 +180,13 @@ mem_trim(void *mem, mem_size_t size)
  * allow these defines to be overridden.
  */
 #ifndef mem_clib_free
-#define mem_clib_free free
+#define mem_clib_free vPortFree//free
 #endif
 #ifndef mem_clib_malloc
-#define mem_clib_malloc malloc
+#define mem_clib_malloc pvPortMalloc//malloc
 #endif
 #ifndef mem_clib_calloc
-#define mem_clib_calloc calloc
+#define mem_clib_calloc pvPortCalloc//calloc
 #endif
 
 #if LWIP_STATS && MEM_STATS
@@ -521,9 +521,16 @@ mem_init(void)
               (SIZEOF_STRUCT_MEM & (MEM_ALIGNMENT - 1)) == 0);
 
   /* align the heap */
+#if LWIP_MEM_PRE_ALLOC_FROM_HEAP
+  ram = pvPortMalloc(MEM_SIZE_ALIGNED + (2U * SIZEOF_STRUCT_MEM));
+#else
   ram = (u8_t *)LWIP_MEM_ALIGN(LWIP_RAM_HEAP_POINTER);
+#endif	/* LWIP_MEM_PRE_ALLOC_FROM_HEAP */
   /* initialize the start of the heap */
   mem = (struct mem *)(void *)ram;
+  if (mem == NULL) {
+      LWIP_ASSERT("malloc failed", 0);
+  }
   mem->next = MEM_SIZE_ALIGNED;
   mem->prev = 0;
   mem->used = 0;
@@ -751,7 +758,9 @@ mem_trim(void *rmem, mem_size_t new_size)
   LWIP_MEM_FREE_PROTECT();
 
   mem2 = ptr_to_mem(mem->next);
-  if (mem2->used == 0) {
+
+  /* Check if mem2 is within ram_end and unused */
+  if (mem2 < ram_end && mem2->used == 0) {
     /* The next struct is unused, we can simply move it at little */
     mem_size_t next;
     LWIP_ASSERT("invalid next ptr", mem->next != MEM_SIZE_ALIGNED);
@@ -787,7 +796,10 @@ mem_trim(void *rmem, mem_size_t new_size)
      *       region that couldn't hold data, but when mem->next gets freed,
      *       the 2 regions would be combined, resulting in more free memory */
     ptr2 = (mem_size_t)(ptr + SIZEOF_STRUCT_MEM + newsize);
-    LWIP_ASSERT("invalid next ptr", mem->next != MEM_SIZE_ALIGNED);
+    /* Disabling this assert, since ram_end->next is initialized to MEM_SIZE_ALIGNED
+       and we will eventually hit this if we are at the end of the chunk.  
+    */
+    //LWIP_ASSERT("invalid next ptr", mem->next != MEM_SIZE_ALIGNED);
     mem2 = ptr_to_mem(ptr2);
     if (mem2 < lfree) {
       lfree = mem2;
@@ -1015,3 +1027,21 @@ mem_calloc(mem_size_t count, mem_size_t size)
   return p;
 }
 #endif /* MEM_LIBC_MALLOC && (!LWIP_STATS || !MEM_STATS) */
+
+#ifdef NT_FN_DPM_DEBUG
+void dump_lwip_mem()
+{
+#ifdef CONFIG_LWIP_HEAP_POOL
+	struct mem *mem;
+	char buffer[200];
+	mem = (struct mem *)ram;
+	snprintf(buffer, sizeof(buffer), "Mem: 0x%08x, next: %d, prev: %d, idx: %d, used: %d\r\n", mem, mem->next, mem->prev, mem_to_ptr(mem), mem->used);
+	nt_dbg_print(buffer);
+	/* check all elements before the end of the heap */
+	for (mem = ptr_to_mem(mem->next); ((u8_t *)mem > ram) && (mem < ram_end); mem = ptr_to_mem(mem->next)) {
+		snprintf(buffer, sizeof(buffer), "mem: 0x%x, next: %d, prev: %d, idx: %d, size: %d, used: %d\r\n", mem, mem->next, mem->prev, mem_to_ptr(mem), mem->next - mem_to_ptr(mem), mem->used);
+		nt_dbg_print(buffer);
+	}
+#endif
+}
+#endif

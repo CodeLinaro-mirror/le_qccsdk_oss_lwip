@@ -307,6 +307,12 @@ struct linger {
 #define IP_MULTICAST_TTL   5
 #define IP_MULTICAST_IF    6
 #define IP_MULTICAST_LOOP  7
+
+#if LWIP_IPV6
+#define IPV6_MULTICAST_HOPS	8
+#define IPV6_MULTICAST_IF	9
+#define IPV6_MULTICAST_LOOP 10
+#endif /* LWIP_IPV6 */
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
 
 #if LWIP_IGMP
@@ -515,7 +521,7 @@ struct pollfd
 /** LWIP_TIMEVAL_PRIVATE: if you want to use the struct timeval provided
  * by your system, set this to 0 and include <sys/time.h> in cc.h */
 #ifndef LWIP_TIMEVAL_PRIVATE
-#define LWIP_TIMEVAL_PRIVATE 1
+#define LWIP_TIMEVAL_PRIVATE 0
 #endif
 
 #if LWIP_TIMEVAL_PRIVATE

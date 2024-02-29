@@ -90,6 +90,15 @@
 #include "lwip/nd6.h"
 #endif
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) static void netif_do_ip_addr_changed(const ip_addr_t *old_addr, const ip_addr_t *new_addr);
+__attribute__ ((section(".lwip_nc_text"))) static int netif_do_set_ipaddr(struct netif *netif, const ip4_addr_t *ipaddr, ip_addr_t *old_addr);
+__attribute__ ((section(".lwip_nc_text"))) static int netif_do_set_netmask(struct netif *netif, const ip4_addr_t *netmask, ip_addr_t *old_nm);
+__attribute__ ((section(".lwip_nc_text"))) static int netif_do_set_gw(struct netif *netif, const ip4_addr_t *gw, ip_addr_t *old_gw);
+__attribute__ ((section(".lwip_nc_text"))) static void netif_issue_reports(struct netif *netif, u8_t report_type);
+__attribute__ ((section(".lwip_nc_text"))) static err_t netif_null_output_ip6(struct netif *netif, struct pbuf *p, const ip6_addr_t *ipaddr);
+__attribute__ ((section(".lwip_nc_text"))) static err_t netif_null_output_ip4(struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr);
+#endif
 #if LWIP_NETIF_STATUS_CALLBACK
 #define NETIF_STATUS_CALLBACK(n) do{ if (n->status_callback) { (n->status_callback)(n); }}while(0)
 #else

@@ -44,6 +44,12 @@
 #include "httpd_opts.h"
 #include "lwip/err.h"
 #include "lwip/pbuf.h"
+#include "mbedtls/certs.h"
+
+extern const char   mbedtls_test_srv_key_ec[];
+extern const size_t mbedtls_test_srv_key_ec_len;
+extern const char mbedtls_test_srv_crt_ec[];
+extern const size_t mbedtls_test_srv_crt_ec_len;
 
 #ifdef __cplusplus
 extern "C" {
@@ -203,12 +209,13 @@ void http_set_ssi_handler(tSSIHandler pfnSSIHandler,
  * @param post_auto_wnd Set this to 0 to let the callback code handle window
  *        updates by calling 'httpd_post_data_recved' (to throttle rx speed)
  *        default is 1 (httpd handles window updates automatically)
+ * @param content_type Content-Type string to get the boundary.
  * @return ERR_OK: Accept the POST request, data may be passed in
  *         another err_t: Deny the POST request, send back 'bad request'.
  */
 err_t httpd_post_begin(void *connection, const char *uri, const char *http_request,
                        u16_t http_request_len, int content_len, char *response_uri,
-                       u16_t response_uri_len, u8_t *post_auto_wnd);
+                       u16_t response_uri_len, u8_t *post_auto_wnd, const char *content_type);
 
 /**
  * @ingroup httpd
@@ -241,11 +248,27 @@ void httpd_post_data_recved(void *connection, u16_t recved_len);
 
 #endif /* LWIP_HTTPD_SUPPORT_POST */
 
+/** Find the boundary value in the Content-Type line.
+ * This value is used to determine how to separate the keys/value pairs.
+ * Looking for boundary=
+ *
+ * @param content_type Content-Type string that contains the boundary.
+ */
+const char * find_boundary(char*content_type );
+
+/** Find the key name in the header of a form value.
+ * Looking for name=
+ *
+ * @param header Header string that contains the name.
+ */
+const char * find_header_name(char*header );
+
 void httpd_init(void);
 
 #if HTTPD_ENABLE_HTTPS
 struct altcp_tls_config;
 void httpd_inits(struct altcp_tls_config *conf);
+void nt_https();
 #endif
 
 #ifdef __cplusplus

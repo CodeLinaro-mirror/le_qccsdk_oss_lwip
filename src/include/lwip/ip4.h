@@ -89,7 +89,11 @@ err_t ip4_output_if_opt_src(struct pbuf *p, const ip4_addr_t *src, const ip4_add
 #endif /* IP_OPTIONS_SEND */
 
 #if LWIP_MULTICAST_TX_OPTIONS
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void  ip4_set_default_multicast_netif(struct netif* default_multicast_netif);
+#else
 void  ip4_set_default_multicast_netif(struct netif* default_multicast_netif);
+#endif
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
 
 #define ip4_netif_get_local_ip(netif) (((netif) != NULL) ? netif_ip_addr4(netif) : NULL)

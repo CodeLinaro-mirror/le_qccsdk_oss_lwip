@@ -67,8 +67,13 @@ struct ip_reassdata {
   u8_t timer;
 };
 
+#ifdef NT_FN_RRAM_PERF_BUILD
+__attribute__ ((section(".lwip_nc_text"))) void ip_reass_init(void);
+__attribute__ ((section(".lwip_nc_text"))) void ip_reass_tmr(void);
+#else
 void ip_reass_init(void);
 void ip_reass_tmr(void);
+#endif
 struct pbuf * ip4_reass(struct pbuf *p);
 #endif /* IP_REASSEMBLY */
 

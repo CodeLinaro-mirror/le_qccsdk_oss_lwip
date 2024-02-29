@@ -307,6 +307,43 @@ const ip_addr_t dns_mquery_v4group = DNS_MQUERY_IPV4_GROUP_INIT;
 const ip_addr_t dns_mquery_v6group = DNS_MQUERY_IPV6_GROUP_INIT;
 #endif /* LWIP_IPV6 */
 
+
+void nt_getupdatedDNScache(void)
+{
+
+	char buffer[ 200 ];
+	int row;
+	char index[15]="DNS index";
+	for( row = 0;row<DNS_TABLE_SIZE ; row++)
+	{
+		snprintf(buffer,sizeof(buffer),"%s-%d\r\t\t%d \t\t%s \t\t%d \t\t%d \t\t%d \t\t%d \t\t%d \t\t%d \n"
+#if ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_RAND_SRC_PORT) != 0)
+			"\t\t%d"
+#endif
+			"\t\t%s"
+#if LWIP_IPV4 && LWIP_IPV6
+				"\t\t%d"
+#endif //LWIP_IPV4 && LWIP_IPV6
+#if LWIP_DNS_SUPPORT_MDNS_QUERIES
+				"\t\t%d"
+#endif// LWIP_DNS_SUPPORT_MDNS_QUERIES
+				"\r\n",
+				index,row,dns_table[row].ttl,dns_table[row].ipaddr,dns_table[row].txid,dns_table[row].state,dns_table[row].server_idx,dns_table[row].tmr,dns_table[row].retries,dns_table[row].seqno
+#if ((LWIP_DNS_SECURE & LWIP_DNS_SECURE_RAND_SRC_PORT) != 0)
+				,dns_table[row].pcb_idx
+#endif
+				,dns_table[row].name
+#if LWIP_IPV4 && LWIP_IPV6
+				,dns_table[row].reqaddrtype
+#endif
+#if LWIP_DNS_SUPPORT_MDNS_QUERIES
+				,dns_table[row].is_mdns
+#endif //LWIP_DNS_SUPPORT_MDNS_QUERIES
+				);
+		nt_dbg_print(buffer);
+	}
+}
+
 /**
  * Initialize the resolver: set up the UDP pcb and configure the default server
  * (if DNS_SERVER_ADDRESS is set).
@@ -1342,6 +1379,9 @@ dns_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, 
             pbuf_free(p);
             dns_table[i].state = DNS_STATE_NEW;
             dns_check_entry(i);
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+            lwip_start_timer(dns_tmr);
+#endif
             return;
           }
 #endif /* LWIP_IPV4 && LWIP_IPV6 */
@@ -1497,6 +1537,9 @@ dns_enqueue(const char *name, size_t hostnamelen, dns_found_callback found,
 
   /* force to send query without waiting timer */
   dns_check_entry(i);
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+  lwip_start_timer(dns_tmr);
+#endif
 
   /* dns query is enqueued */
   return ERR_INPROGRESS;
@@ -1628,4 +1671,18 @@ dns_gethostbyname_addrtype(const char *hostname, ip_addr_t *addr, dns_found_call
                      LWIP_DNS_ISMDNS_ARG(is_mdns));
 }
 
+#if NT_FN_LWIP_DYNAMIC_TIMERS
+u8_t
+dns_tmr_needed()
+{
+  int i;
+
+  for (i = 0; i < DNS_TABLE_SIZE; ++i) {
+	if (dns_table[i].state != DNS_STATE_UNUSED) {
+		return 1;
+	}
+  }
+  return 0;
+}
+#endif
 #endif /* LWIP_DNS */
