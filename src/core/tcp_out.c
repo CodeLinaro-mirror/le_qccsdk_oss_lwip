@@ -124,6 +124,9 @@
 #endif
 #endif
 
+#define TCP_QUEUE_PBUF_THRESHOLD_DEFAULT    21
+u32_t tcp_queue_pbuf_threshold = TCP_QUEUE_PBUF_THRESHOLD_DEFAULT;
+
 #ifdef NT_FN_RRAM_PERF_BUILD
 __attribute__ ((section(".lwip_nc_text"))) static struct pbuf *tcp_output_alloc_header_common(u32_t ackno, u16_t optlen, u16_t datalen,
                         u32_t seqno_be /* already in network byte order */,
@@ -442,9 +445,14 @@ tcp_write(struct tcp_pcb *pcb, const void *arg, u16_t len, u8_t apiflags)
 
   err = tcp_write_checks(pcb, len);
   if (err != ERR_OK) {
+    printf("## err=%d\n",err);
     return err;
   }
   queuelen = pcb->snd_queuelen;
+
+  if (queuelen > tcp_queue_pbuf_threshold) {
+    goto memerr ;
+  }
 
 #if LWIP_TCP_TIMESTAMPS
   if ((pcb->flags & TF_TIMESTAMP)) {
@@ -924,6 +932,7 @@ tcp_split_unsent_seg(struct tcp_pcb *pcb, u16_t split)
 
   seg = tcp_create_segment(pcb, p, remainder_flags, lwip_ntohl(useg->tcphdr->seqno) + split, optflags);
   if (seg == NULL) {
+    p = NULL; /* Freed by tcp_create_segment */
     LWIP_DEBUGF(TCP_OUTPUT_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                 ("tcp_split_unsent_seg: could not create new TCP segment\n"));
     goto memerr;
@@ -1047,11 +1056,11 @@ tcp_enqueue_flags(struct tcp_pcb *pcb, u8_t flags)
   u8_t optflags = 0;
   u8_t optlen = 0;
 
-  LWIP_DEBUGF(TCP_QLEN_DEBUG, ("tcp_enqueue_flags: queuelen: %"U16_F"\n", (u16_t)pcb->snd_queuelen));
-
   LWIP_ASSERT("tcp_enqueue_flags: need either TCP_SYN or TCP_FIN in flags (programmer violates API)",
               (flags & (TCP_SYN | TCP_FIN)) != 0);
   LWIP_ASSERT("tcp_enqueue_flags: invalid pcb", pcb != NULL);
+
+  LWIP_DEBUGF(TCP_QLEN_DEBUG, ("tcp_enqueue_flags: queuelen: %"U16_F"\n", (u16_t)pcb->snd_queuelen));
 
   /* No need to check pcb->snd_queuelen if only SYN or FIN are allowed! */
 
@@ -1454,7 +1463,8 @@ tcp_output_segment_busy(const struct tcp_seg *seg)
   /* no other references found */
   return 0;
 }
-
+u32_t debug_lwip_tcp_tx_seq[100]={0};
+u8_t debug_lwip_tcp_tx_seq_index = 0;
 /**
  * Called by tcp_output() to actually send a TCP segment over IP.
  *
@@ -1555,6 +1565,10 @@ tcp_output_segment(struct tcp_seg *seg, struct tcp_pcb *pcb, struct netif *netif
   LWIP_DEBUGF(TCP_OUTPUT_DEBUG, ("tcp_output_segment: %"U32_F":%"U32_F"\n",
                                  lwip_htonl(seg->tcphdr->seqno), lwip_htonl(seg->tcphdr->seqno) +
                                  seg->len));
+//printf("seq:%u\n", lwip_htonl(seg->tcphdr->seqno));
+debug_lwip_tcp_tx_seq[debug_lwip_tcp_tx_seq_index++] = lwip_htonl(seg->tcphdr->seqno);
+if(debug_lwip_tcp_tx_seq_index>100)
+    debug_lwip_tcp_tx_seq_index = 0;
 
   len = (u16_t)((u8_t *)seg->tcphdr - (u8_t *)seg->p->payload);
   if (len == 0) {
@@ -1939,6 +1953,7 @@ tcp_output_control_segment(const struct tcp_pcb *pcb, struct pbuf *p,
 
   netif = tcp_route(pcb, src, dst);
   if (netif == NULL) {
+    pbuf_free(p);
     err = ERR_RTE;
   } else {
     u8_t ttl, tos;
@@ -2021,6 +2036,10 @@ tcp_rst(const struct tcp_pcb *pcb, u32_t seqno, u32_t ackno,
   LWIP_DEBUGF(TCP_RST_DEBUG, ("tcp_rst: seqno %"U32_F" ackno %"U32_F".\n", seqno, ackno));
 }
 
+uint32_t debug_tcp_ack=0;
+uint32_t debug_tcp_ack_seq[100]={0};
+u8_t debug_index=0;
+
 /**
  * Send an ACK without data.
  *
@@ -2063,10 +2082,16 @@ tcp_send_empty_ack(struct tcp_pcb *pcb)
   pcb->ts_lastacksent = pcb->rcv_nxt;
 #endif
 
+
+debug_tcp_ack_seq[debug_index++] = pcb->rcv_nxt;
+if(debug_index>100)
+    debug_index = 0;
+
   LWIP_DEBUGF(TCP_OUTPUT_DEBUG,
               ("tcp_output: sending ACK for %"U32_F"\n", pcb->rcv_nxt));
   err = tcp_output_control_segment(pcb, p, &pcb->local_ip, &pcb->remote_ip);
   if (err != ERR_OK) {
+     printf("tcp_output: sending ACK err %d \n",err);
     /* let tcp_fasttmr retry sending this ACK */
     tcp_set_flags(pcb, TF_ACK_DELAY | TF_ACK_NOW);
   } else {

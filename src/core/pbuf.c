@@ -749,8 +749,18 @@ pbuf_free(struct pbuf *p)
      * we must protect it. We put the new ref into a local variable to prevent
      * further protection. */
     SYS_ARCH_PROTECT(old_level);
+#if 0
     /* all pbufs in a chain are referenced at least once */
     LWIP_ASSERT("pbuf_free: p->ref > 0", p->ref > 0);
+#else
+    if (p->ref == 0)
+    {
+        SYS_ARCH_UNPROTECT(old_level);
+        q = p->next;
+        p = q;
+        continue;
+    }
+#endif
     /* decrease reference count (number of pointers to pbuf) */
     ref = --(p->ref);
     SYS_ARCH_UNPROTECT(old_level);

@@ -9,6 +9,8 @@
 #include "lwipopts.h"
 #include "lwip/prot/dhcp.h"
 #include "nt_common.h"
+#include "wifi_cmn.h"
+#include "fwconfig_cmn.h"
 #include "nt_flags.h"
 #include "ip_addr.h"
 /*
@@ -97,6 +99,7 @@ struct dhcps_lease {
 	NT_BOOL enable;
 	ip_addr_t start_ip;
 	ip_addr_t end_ip;
+	uint32_t  lease_time;
 };
 
 enum dhcps_offer_option{

@@ -745,7 +745,11 @@ void nt_dhcps_start(struct netif *netif, struct ip_info *info)
 		return;
 	}
 
-	dhcp_config->dhcps_lease_time = DHCPS_LEASE_TIME_DEF;
+	if(dhcps_lease.lease_time != 0){
+		dhcp_config->dhcps_lease_time = dhcps_lease.lease_time;
+	} else {
+		dhcp_config->dhcps_lease_time = DHCPS_LEASE_TIME_DEF;
+	}
 	dhcp_config->renew = FALSE;
 	dhcp_config->offer = 0xFF;
 	dhcp_config->netif = netif;
@@ -870,6 +874,7 @@ NT_BOOL nt_set_dhcps_lease(struct dhcps_lease *please)
 		memset(&dhcps_lease, 0x0, sizeof(dhcps_lease));
 		ip_2_ip4(&dhcps_lease.start_ip)->addr = ip_2_ip4(&please->start_ip)->addr;
 		ip_2_ip4(&dhcps_lease.end_ip)->addr = ip_2_ip4(&please->end_ip)->addr;
+		dhcps_lease.lease_time = please->lease_time;
 	}
 	dhcps_lease.enable = please->enable;
 	//	dhcps_lease_flag = FALSE;
@@ -1136,7 +1141,7 @@ uint32_t nt_dhcps_client_update(uint8_t *bssid, ip_addr_t *ip)
 			}
 		}
 		if (ip != NULL) {
-			if (memcmp(ip_2_ip4(&pdhcps_pool->ip)->addr, &(ip_2_ip4(ip)->addr), sizeof(ip_2_ip4(&pdhcps_pool->ip)->addr)) == 0) {
+			if (memcmp(&(ip_2_ip4(&pdhcps_pool->ip)->addr), &(ip_2_ip4(ip)->addr), sizeof(ip_2_ip4(&pdhcps_pool->ip)->addr)) == 0) {
 				pip_node = pback_node;
 			}
 		} else if (flag == FALSE){

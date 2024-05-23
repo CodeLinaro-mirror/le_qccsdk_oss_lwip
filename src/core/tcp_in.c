@@ -110,6 +110,9 @@ static void tcp_remove_sacks_gt(struct tcp_pcb *pcb, u32_t seq);
 #endif /* TCP_OOSEQ_BYTES_LIMIT || TCP_OOSEQ_PBUFS_LIMIT */
 #endif /* LWIP_TCP_SACK_OUT */
 
+
+uint32_t debug_tcp_input_seq_index=0;
+uint32_t debug_tcp_input_seq[100]={0};
 /**
  * The initial input processing of TCP. It verifies the TCP header, demultiplexes
  * the segment between the PCBs and passes it on to tcp_process(), which implements
@@ -235,6 +238,10 @@ tcp_input(struct pbuf *p, struct netif *inp)
   seqno = tcphdr->seqno = lwip_ntohl(tcphdr->seqno);
   ackno = tcphdr->ackno = lwip_ntohl(tcphdr->ackno);
   tcphdr->wnd = lwip_ntohs(tcphdr->wnd);
+
+debug_tcp_input_seq[debug_tcp_input_seq_index++] = seqno;
+if(debug_tcp_input_seq_index>100)
+    debug_tcp_input_seq_index = 0;
 
   flags = TCPH_FLAGS(tcphdr);
   tcplen = p->tot_len;
@@ -857,8 +864,9 @@ tcp_process(struct tcp_pcb *pcb)
   /* Do different things depending on the TCP state. */
   switch (pcb->state) {
     case SYN_SENT:
-      LWIP_DEBUGF(TCP_INPUT_DEBUG, ("SYN-SENT: ackno %"U32_F" pcb->snd_nxt %"U32_F" unacked %"U32_F"\n", ackno,
-                                    pcb->snd_nxt, lwip_ntohl(pcb->unacked->tcphdr->seqno)));
+      LWIP_DEBUGF(TCP_INPUT_DEBUG, ("SYN-SENT: ackno %"U32_F" pcb->snd_nxt %"U32_F" unacked %s %"U32_F"\n",
+                                    ackno, pcb->snd_nxt, pcb->unacked ? "" : " empty:",
+                                    pcb->unacked ? lwip_ntohl(pcb->unacked->tcphdr->seqno) : 0));
       /* received SYN ACK with expected sequence number? */
       if ((flags & TCP_ACK) && (flags & TCP_SYN)
           && (ackno == pcb->lastack + 1)) {
