@@ -927,6 +927,10 @@ ip4_output_if_opt_src(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *d
     chk_sum += iphdr->_len;
 #endif /* CHECKSUM_GEN_IP_INLINE */
     IPH_OFFSET_SET(iphdr, 0);
+    #define IPPROTO_ICMP 1
+    if (proto == IPPROTO_ICMP) {
+      IPH_OFFSET_SET(iphdr, lwip_htons(IP_DF));
+    }
     IPH_ID_SET(iphdr, lwip_htons(ip_id));
 #if CHECKSUM_GEN_IP_INLINE
     chk_sum += iphdr->_id;
