@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+*/
+
 /**
  * @file
  * Ethernet common functions
@@ -64,6 +69,10 @@
 const struct eth_addr ethbroadcast = {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
 const struct eth_addr ethzero = {{0, 0, 0, 0, 0, 0}};
 
+#ifdef CONFIG_QCSPI_HFC_ETH_ENABLE
+extern int hfc_rx_raw_ether(struct pbuf *p, struct netif *netif);
+#endif
+
 /**
  * @ingroup lwip_nosys
  * Process received ethernet frames. Using this function instead of directly
@@ -110,6 +119,13 @@ ethernet_input(struct pbuf *p, struct netif *netif)
                (unsigned char)ethhdr->src.addr[0],  (unsigned char)ethhdr->src.addr[1],  (unsigned char)ethhdr->src.addr[2],
                (unsigned char)ethhdr->src.addr[3],  (unsigned char)ethhdr->src.addr[4],  (unsigned char)ethhdr->src.addr[5],
                lwip_htons(ethhdr->type)));
+
+#ifdef CONFIG_QCSPI_HFC_ETH_ENABLE
+  if (wifi_fw_in_hosted_mode()) {
+    hfc_rx_raw_ether(p, netif);
+    goto free_and_return;
+  }
+#endif
 
   type = ethhdr->type;
 #if ETHARP_SUPPORT_VLAN
