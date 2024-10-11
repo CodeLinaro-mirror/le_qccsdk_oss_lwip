@@ -1542,6 +1542,10 @@ lwip_netconn_do_send(void *m)
           if (ip_addr_isany(&msg->msg.b->addr) || IP_IS_ANY_TYPE_VAL(msg->msg.b->addr)) {
             err = raw_send(msg->conn->pcb.raw, msg->msg.b->p);
           } else {
+#define IPPROTO_ICMP 1
+            if (msg->conn->pcb.raw->protocol == IPPROTO_ICMP) {
+              msg->msg.b->p->flags |= PBUF_FLAG_IP_DF_ENABLE;
+            }
             err = raw_sendto(msg->conn->pcb.raw, msg->msg.b->p, &msg->msg.b->addr);
           }
           break;
