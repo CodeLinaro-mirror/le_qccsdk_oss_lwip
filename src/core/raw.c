@@ -506,6 +506,11 @@ raw_sendto_if_src(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
   }
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
 
+  /* IP DF enable flag for pmtud */
+  if (p->flags & PBUF_FLAG_IP_DF_ENABLE) {
+    q->flags |= PBUF_FLAG_IP_DF_ENABLE;
+  }
+  
 #if LWIP_IPV6
   /* If requested, based on the IPV6_CHECKSUM socket option per RFC3542,
      compute the checksum and update the checksum in the payload. */

@@ -930,6 +930,7 @@ ip4_output_if_opt_src(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *d
     /* FOR PMTUD */
     if (p->flags &= PBUF_FLAG_IP_DF_ENABLE) {
       IPH_OFFSET_SET(iphdr, lwip_htons(IP_DF));
+      chk_sum += iphdr->_offset;
     }
     
     IPH_ID_SET(iphdr, lwip_htons(ip_id));
