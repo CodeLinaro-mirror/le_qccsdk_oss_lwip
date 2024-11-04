@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 /**
  * @file
  * SNTP client API
@@ -57,6 +62,7 @@ u8_t sntp_enabled(void);
 
 void sntp_setserver(u8_t idx, const ip_addr_t *addr);
 const ip_addr_t* sntp_getserver(u8_t idx);
+u8_t sntp_getkodreceived(u8_t idx);
 
 #if SNTP_MONITOR_SERVER_REACHABILITY
 u8_t sntp_getreachability(u8_t idx);
