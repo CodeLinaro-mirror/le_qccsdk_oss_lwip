@@ -2981,6 +2981,12 @@ lwip_getsockopt_impl(int s, int level, int optname, void *optval, socklen_t *opt
           *(int *)optval = netconn_get_recvbufsize(sock->conn);
           break;
 #endif /* LWIP_SO_RCVBUF */
+#if LWIP_SO_SNDBUF
+        case SO_SNDBUF:
+          LWIP_SOCKOPT_CHECK_OPTLEN_CONN(sock, *optlen, int);
+          *(int *)optval = netconn_get_sndbufsize(sock->conn);
+          break;
+#endif /*LWIP_SO_SNDBUF*/
 #if LWIP_SO_LINGER
         case SO_LINGER: {
           s16_t conn_linger;
@@ -3381,6 +3387,12 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
           netconn_set_recvbufsize(sock->conn, *(const int *)optval);
           break;
 #endif /* LWIP_SO_RCVBUF */
+#if LWIP_SO_SNDBUF
+        case SO_SNDBUF:
+          LWIP_SOCKOPT_CHECK_OPTLEN_CONN(sock, optlen, int);
+          netconn_set_sndbufsize(sock->conn, *(const int *)optval);
+          break;
+#endif  /* LWIP_SO_SNDBUF */
 #if LWIP_SO_LINGER
         case SO_LINGER: {
           const struct linger *linger = (const struct linger *)optval;
