@@ -449,7 +449,7 @@
  * (requires the LWIP_TCP option)
  */
 #if !defined MEMP_NUM_TCP_PCB || defined __DOXYGEN__
-#define MEMP_NUM_TCP_PCB                5
+#define MEMP_NUM_TCP_PCB                7
 #endif
 
 /**

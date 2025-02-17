@@ -413,6 +413,12 @@ err_t   netconn_err(struct netconn *conn);
 /** Get the receive buffer in bytes */
 #define netconn_get_recvbufsize(conn)               ((conn)->recv_bufsize)
 #endif /* LWIP_SO_RCVBUF*/
+#if LWIP_SO_SNDBUF
+/** Set the tcp send window in bytes */
+#define netconn_set_sndbufsize(conn, sndbufsize)    ((conn)->pcb.tcp->snd_buf = (sndbufsize))
+/** Get the tcp send window in bytes */
+#define netconn_get_sndbufsize(conn)    ((conn)->pcb.tcp->snd_buf)
+#endif /*LWIP_SO_SNDBUF*/
 
 #if LWIP_NETCONN_SEM_PER_THREAD
 void netconn_thread_init(void);
