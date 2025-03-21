@@ -65,6 +65,7 @@
 #include "lwip/dns.h"
 
 #include <string.h>
+#include "data_path.h"
 
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
@@ -128,6 +129,10 @@ static void nd6_send_neighbor_cache_probe(struct nd6_neighbor_cache_entry *entry
 #if LWIP_IPV6_SEND_ROUTER_SOLICIT
 static err_t nd6_send_rs(struct netif *netif);
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
+
+#if LWIP_IPV6_SEND_ROUTER_ADVERTISE
+static err_t nd6_send_ra(struct netif *netif, ip6_addr_t *target_addr);
+#endif /* LWIP_IPV6_SEND_ROUTER_ADVERTISE */
 
 #if LWIP_ND6_QUEUEING
 static void nd6_free_q(struct nd6_q_entry *q);
@@ -552,6 +557,31 @@ nd6_input(struct pbuf *p, struct netif *inp)
 
     break; /* ICMP6_TYPE_NS */
   }
+#if LWIP_IPV6_SEND_ROUTER_ADVERTISE
+  case ICMP6_TYPE_RS: /* Router Solicitation */
+  {
+    /* Check that RS header fits in packet. */
+    if (p->len < sizeof(struct rs_header)) {
+      /* @todo debug message */
+      pbuf_free(p);
+      ND6_STATS_INC(nd6.lenerr);
+      ND6_STATS_INC(nd6.drop);
+      return;
+    }
+
+    device_t *dev = (device_t *)(inp->state); 
+    if(dev->role == AP_DEVICE) {
+      if (!ip6_addr_isany(ip6_current_src_addr())) {
+        nd6_send_ra(inp, ip6_current_src_addr());
+      } else {
+        nd6_send_ra(inp, NULL);
+      }
+      LWIP_DEBUGF(LWIP_DBG_TRACE, ("nd6(%c%c): send solicited ra, target addr %s\r\n",
+            inp->name[0], inp->name[1], ip6addr_ntoa(ip6_current_src_addr())));
+    }
+    break;
+  }
+#endif /* LWIP_IPV6_SEND_ROUTER_ADVERTISE */
   case ICMP6_TYPE_RA: /* Router Advertisement. */
   {
     struct ra_header *ra_hdr;
@@ -1122,6 +1152,7 @@ nd6_tmr(void)
 #if LWIP_IPV6_ADDRESS_LIFETIMES
           if (!netif_ip6_addr_isstatic(netif, i) &&
               netif_ip6_addr_pref_life(netif, i) == 0) {
+
             addr_state = IP6_ADDR_DEPRECATED;
           }
 #endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
@@ -1158,6 +1189,41 @@ nd6_tmr(void)
   }
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
 
+#if LWIP_IPV6_SEND_ROUTER_ADVERTISE
+  NETIF_FOREACH(netif) {
+    device_t *dev = (device_t *)(netif->state); 
+    if(dev->role == AP_DEVICE) {
+      if ((netif->flags & NETIF_FLAG_UP) && (!ip6_addr_isinvalid(netif_ip6_addr_state(netif, 0)))) {
+        if (netif->ra_is_initial) {
+          if (netif->ra_initial_count > 0) {
+            if (netif->ra_timer > 0) {
+              netif->ra_timer--;
+            } else { /* Initial timer is expired, send ra, decrease the inital count, reset the timer */
+              nd6_send_ra(netif, NULL);
+              netif->ra_initial_count--;
+              netif->ra_timer = LWIP_ND6_INITIAL_RA_INTERVAL;
+              LWIP_DEBUGF(LWIP_DBG_TRACE, ("nd6(%c%c): send initial ra, left %d, interval %d\r\n",
+                    netif->name[0], netif->name[1], netif->ra_initial_count, netif->ra_timer));
+            }
+          } else { /* Initial ra sent, unset is_initial, reset the timer to normal interval */
+            netif->ra_timer = LWIP_ND6_NORMAL_RA_INTERVAL;
+            netif->ra_is_initial = 0;
+          } 
+        } else {
+            if (netif->ra_timer > 0 ) {
+              netif->ra_timer--;
+            } else { /* Normal ra timer is expired */
+              nd6_send_ra(netif, NULL);
+              netif->ra_timer = LWIP_ND6_NORMAL_RA_INTERVAL;
+              LWIP_DEBUGF(LWIP_DBG_TRACE, ("nd6(%c%c): send normal ra, interval %d\r\n",
+                    netif->name[0], netif->name[1], netif->ra_timer));
+            }
+
+        }
+      }
+    }
+  }
+#endif /* LWIP_IPV6_SEND_ROUTER_ADVERTISE */
 }
 
 /** Send a neighbor solicitation message for a specific neighbor cache entry
@@ -1390,6 +1456,100 @@ nd6_send_rs(struct netif *netif)
   return err;
 }
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
+
+#if LWIP_IPV6_SEND_ROUTER_ADVERTISE
+/**
+ * Send a router advertisement message
+ *
+ * @param netif the netif to send the msg
+ * @param target_addr the source addr of the rs or NULL for periodically ra
+ */
+static err_t
+nd6_send_ra(struct netif *netif, ip6_addr_t *target_addr)
+{
+  struct ra_header *ra_hdr;
+  struct prefix_option *prefix_opt;
+  struct pbuf *p;
+  const ip6_addr_t *src_addr;
+  err_t err;
+  u32_t ra_prefix[2];
+  u16_t prefix_opt_len;
+
+  /* Get prefix of global addr from slot 1 */
+  if (ip6_addr_isvalid(netif_ip6_addr_state(netif, 1))) {
+    ra_prefix[0] = netif_ip6_addr(netif, 1)->addr[0];
+    ra_prefix[1] = netif_ip6_addr(netif, 1)->addr[1];
+    ip6_addr_t *my_ip6_addr = netif_ip6_addr(netif, 1);
+  } else {
+    return ERR_IF;
+  }
+
+  /* The source addr is link local addr */
+  if (ip6_addr_isvalid(netif_ip6_addr_state(netif, 0))) {
+    src_addr = netif_ip6_addr(netif, 0);
+  } else {
+    return ERR_IF;
+  }
+
+  /* The dest address should be the source addr of rs or the all nodes addr */
+  if (target_addr == NULL) {
+    ip6_addr_set_allnodes_linklocal(&multicast_address);
+  }
+
+  /* Allocate a packet */
+  prefix_opt_len = sizeof(struct prefix_option);
+  p = pbuf_alloc(PBUF_IP, sizeof(struct ra_header) + prefix_opt_len, PBUF_RAM);
+  if (p==NULL) {
+    ND6_STATS_INC(nd6.memerr);
+    return ERR_BUF;
+  }
+
+  /* Set fields. */
+  ra_hdr = (struct ra_header *)p->payload;
+
+  ra_hdr->type = ICMP6_TYPE_RA;
+  ra_hdr->code = 0;
+  ra_hdr->chksum = 0;
+  ra_hdr->current_hop_limit = 0;
+  ra_hdr->flags = 0; /* 0 means not by DHCPv6 */
+  ra_hdr->router_lifetime = 0;
+  ra_hdr->reachable_time = 0;
+  ra_hdr->retrans_timer = 0;
+
+  prefix_opt = (struct prefix_option *)((u8_t *)p->payload + sizeof(struct ra_header));
+
+  prefix_opt->type = ND6_OPTION_TYPE_PREFIX_INFO;
+  prefix_opt->length = 4; /* 32 bytes */
+  prefix_opt->prefix_length = 0x40; /* 64 */
+  prefix_opt->flags = ND6_PREFIX_FLAG_ON_LINK | ND6_PREFIX_FLAG_AUTONOMOUS;
+  prefix_opt->valid_lifetime = lwip_htonl(604800);
+  prefix_opt->preferred_lifetime = lwip_htonl(86400);
+  prefix_opt->reserved2[0] = 0;
+  prefix_opt->reserved2[1] = 0;
+  prefix_opt->reserved2[2] = 0;
+  prefix_opt->site_prefix_length = 0;
+  prefix_opt->prefix.addr[0] = ra_prefix[0];
+  prefix_opt->prefix.addr[1] = ra_prefix[1];
+  prefix_opt->prefix.addr[2] = 0;
+  prefix_opt->prefix.addr[3] = 0;
+
+#if CHECKSUM_GEN_ICMP6
+  IF__NETIF_CHECKSUM_ENABLED(netif, NETIF_CHECKSUM_GEN_ICMP6) {
+    ra_hdr->chksum = ip6_chksum_pseudo(p, IP6_NEXTH_ICMP6, p->len, src_addr,
+        (target_addr == NULL) ? &multicast_address : target_addr);
+  }
+#endif /* CHECKSUM_GEN_ICMP6 */
+
+  /* Send the packet out. */
+  ND6_STATS_INC(nd6.xmit);
+
+  err = ip6_output_if(p, src_addr, (target_addr == NULL) ? &multicast_address : target_addr,
+      LWIP_ICMP6_HL, 0, IP6_NEXTH_ICMP6, netif);
+  pbuf_free(p);
+
+  return err;
+}
+#endif /* LWIP_IPV6_SEND_ROUTER_ADVERTISE */
 
 /**
  * Search for a neighbor cache entry
@@ -2430,6 +2590,12 @@ nd6_restart_netif(struct netif *netif)
   /* Send Router Solicitation messages (see RFC 4861, ch. 6.3.7). */
   netif->rs_count = LWIP_ND6_MAX_MULTICAST_SOLICIT;
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
+
+#if LWIP_IPV6_SEND_ROUTER_ADVERTISE
+  netif->ra_is_initial = 1;
+  netif->ra_initial_count = LWIP_ND6_MAX_INITIAL_RA;
+  netif->ra_timer = LWIP_ND6_INITIAL_RA_INTERVAL;
+#endif /* LWIP_IPV6_SEND_ROUTER_ADVERTISE */
 }
 
 #endif /* LWIP_IPV6 */
