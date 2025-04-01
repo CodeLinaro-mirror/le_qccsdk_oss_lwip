@@ -86,6 +86,12 @@
 
 #include <string.h>
 
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+#include "err.h"
+
+extern int g_non_OS;
+#endif
+
 #define SIZEOF_STRUCT_PBUF        LWIP_MEM_ALIGN_SIZE(sizeof(struct pbuf))
 /* Since the pool is created in memp, PBUF_POOL_BUFSIZE will be automatically
    aligned there. Therefore, PBUF_POOL_BUFSIZE_ALIGNED can be used here. */
@@ -748,14 +754,20 @@ pbuf_free(struct pbuf *p)
     /* Since decrementing ref cannot be guaranteed to be a single machine operation
      * we must protect it. We put the new ref into a local variable to prevent
      * further protection. */
-    SYS_ARCH_PROTECT(old_level);
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+     if (g_non_OS == 0)
+#endif
+      SYS_ARCH_PROTECT(old_level);
 #if 0
     /* all pbufs in a chain are referenced at least once */
     LWIP_ASSERT("pbuf_free: p->ref > 0", p->ref > 0);
 #else
     if (p->ref == 0)
     {
-        SYS_ARCH_UNPROTECT(old_level);
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+      if (g_non_OS == 0)
+#endif
+          SYS_ARCH_UNPROTECT(old_level);
         q = p->next;
         p = q;
         continue;
@@ -763,7 +775,10 @@ pbuf_free(struct pbuf *p)
 #endif
     /* decrease reference count (number of pointers to pbuf) */
     ref = --(p->ref);
-    SYS_ARCH_UNPROTECT(old_level);
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+    if (g_non_OS == 0)
+#endif
+      SYS_ARCH_UNPROTECT(old_level);
     /* this pbuf is no longer referenced to? */
     if (ref == 0) {
       /* remember next pbuf in chain for next iteration */
