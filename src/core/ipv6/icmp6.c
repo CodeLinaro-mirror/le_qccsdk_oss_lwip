@@ -122,6 +122,9 @@ icmp6_input(struct pbuf *p, struct netif *inp)
     nd6_input(p, inp);
     return;
   case ICMP6_TYPE_RS:
+#if LWIP_IPV6_SEND_ROUTER_ADVERTISE
+    nd6_input(p, inp);
+#endif
 #if LWIP_IPV6_FORWARD
     /* @todo implement router functionality */
 #endif
