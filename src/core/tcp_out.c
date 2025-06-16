@@ -547,7 +547,11 @@ tcp_write(struct tcp_pcb *pcb, const void *arg, u16_t len, u8_t apiflags)
      * it after rexmit puts a segment from unacked to unsent and at this point,
      * oversize info is lost.
      */
+#ifdef CONFIG_LWIP_MULTIPLE_STREAMS
+    if ((pos < len) && (space > 0) && (last_unsent->len > 0) && (seg->tcphdr->seqno + len == pcb->snd_lbb + pos)) {
+#else
     if ((pos < len) && (space > 0) && (last_unsent->len > 0)) {
+#endif
       u16_t seglen = LWIP_MIN(space, len - pos);
       seg = last_unsent;
 

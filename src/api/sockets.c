@@ -64,6 +64,7 @@
 #endif
 
 #include <string.h>
+#include <stdio.h>
 
 #ifdef LWIP_HOOK_FILENAME
 #include LWIP_HOOK_FILENAME
@@ -536,6 +537,25 @@ alloc_socket(struct netconn *newconn, int accepted)
     SYS_ARCH_UNPROTECT(lev);
   }
   return -1;
+}
+
+//for socket debug
+int lwip_socket_count(void)
+{
+  int total  = 0;
+  int tcp_count = 0;
+  int udp_count = 0;
+  for (int i = 0; i < NUM_SOCKETS; ++i) {
+    if (NULL != sockets[i].conn) {
+      ++total;
+      if(NETCONN_TCP & sockets[i].conn->type)
+       ++tcp_count;
+      if(NETCONN_UDP & sockets[i].conn->type)
+       ++udp_count;
+    }
+  }
+  printf("INFO: LWIP: lwip socket count: total:%d tcp:%d udp:%d\r\n", total, tcp_count, udp_count);
+  return total;
 }
 
 /** Free a socket (under lock)

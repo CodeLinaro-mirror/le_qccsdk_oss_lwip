@@ -121,10 +121,10 @@ ethernet_input(struct pbuf *p, struct netif *netif)
                lwip_htons(ethhdr->type)));
 
 #ifdef CONFIG_QCSPI_HFC_ETH_ENABLE
-  if (wifi_fw_in_hosted_mode()) {
+  //if (wifi_fw_in_hosted_mode()) {
     hfc_rx_raw_ether(p, netif);
     goto free_and_return;
-  }
+  //}
 #endif
 
   type = ethhdr->type;
