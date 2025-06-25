@@ -2674,7 +2674,7 @@
  * servers to the DNS module.
  */
 #if !defined LWIP_ND6_RDNSS_MAX_DNS_SERVERS || defined __DOXYGEN__
-#define LWIP_ND6_RDNSS_MAX_DNS_SERVERS  0
+#define LWIP_ND6_RDNSS_MAX_DNS_SERVERS  1
 #endif
 /**
  * @}
