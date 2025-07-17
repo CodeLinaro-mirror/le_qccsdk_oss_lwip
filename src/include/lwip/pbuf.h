@@ -183,6 +183,8 @@ typedef enum {
 #define PBUF_FLAG_TCP_FIN   0x20U
 /** indicates this pbuf packets IP header enable DF */
 #define PBUF_FLAG_IP_DF_ENABLE 0x40U
+/** indicates this pbuf ETH header of IP packet stripped */
+#define PBUF_FLAG_IP_ETH_STRIPPED 0x80U
 
 /** Main packet buffer struct */
 struct pbuf {
