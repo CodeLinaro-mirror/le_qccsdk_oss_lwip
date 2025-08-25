@@ -236,6 +236,7 @@ struct linger {
 
 #define AF_UNSPEC       0
 #define AF_INET         2
+#define AF_PACKET       5
 #if LWIP_IPV6
 #define AF_INET6        10
 #else /* LWIP_IPV6 */
@@ -255,6 +256,10 @@ struct linger {
 #endif /* LWIP_IPV6 */
 #define IPPROTO_UDPLITE 136
 #define IPPROTO_RAW     255
+/*148-252 is unassigned number, reserved 237 to 251 for ethernet raw frame*/
+#define ETHPROTO_IP     237
+#define ETHPROTO_EAP    251
+#define ETHPROTO_MAX    252 /*Max value for ETHPROTO, should not be used*/
 
 /* Flags we can use with send and recv. */
 #define MSG_PEEK       0x01    /* Peeks at an incoming message */

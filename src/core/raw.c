@@ -46,7 +46,10 @@
  */
 
 #include "lwip/opt.h"
+#include "netif/ethernet.h"
+#include "pbuf.h"
 #include "safeAPI.h"
+#include <stdint.h>
 
 #if LWIP_RAW /* don't build if not configured for use in lwipopts.h */
 
@@ -60,6 +63,8 @@
 #include "lwip/ip6.h"
 #include "lwip/ip6_addr.h"
 #include "lwip/inet_chksum.h"
+#include "data_path.h"
+#include "sockets.h"
 
 #include <string.h>
 
@@ -142,22 +147,37 @@ raw_input(struct pbuf *p, struct netif *inp)
 
   LWIP_UNUSED_ARG(inp);
 
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+  struct eth_hdr *ethhdr;
+  uint8_t eth_proto = ETHPROTO_MAX;
+
+  if(!(p->flags & PBUF_FLAG_IP_ETH_STRIPPED)){
+    ethhdr = (struct eth_hdr *)p->payload;
+
+    if(ethhdr->type == PP_HTONS(ETHTYPE_EAP)){
+      eth_proto = ETHPROTO_EAP;
+    }
+  }else{
+    eth_proto = ETHPROTO_IP;
+  }
+#endif /*CONFIG_SUPPORT_LWIP_RAW_SOCKET*/
+
 #if LWIP_IPV6
 #if LWIP_IPV4
-  if (IP_HDR_GET_VERSION(p->payload) == 6)
+    if (IP_HDR_GET_VERSION(p->payload) == 6)
 #endif /* LWIP_IPV4 */
-  {
-    struct ip6_hdr *ip6hdr = (struct ip6_hdr *)p->payload;
-    proto = IP6H_NEXTH(ip6hdr);
-  }
+    {
+      struct ip6_hdr *ip6hdr = (struct ip6_hdr *)p->payload;
+      proto = IP6H_NEXTH(ip6hdr);
+    }
 #if LWIP_IPV4
-  else
+    else
 #endif /* LWIP_IPV4 */
 #endif /* LWIP_IPV6 */
 #if LWIP_IPV4
-  {
-    proto = IPH_PROTO((struct ip_hdr *)p->payload);
-  }
+    {
+      proto = IPH_PROTO((struct ip_hdr *)p->payload);
+    }
 #endif /* LWIP_IPV4 */
 
   prev = NULL;
@@ -196,6 +216,35 @@ raw_input(struct pbuf *p, struct netif *inp)
       }
       /* no receive callback function was set for this raw PCB */
     }
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+    else if(pcb->protocol == eth_proto)
+    {
+      if (pcb->recv != NULL) {
+        u8_t eaten;
+#ifndef LWIP_NOASSERT
+        void *old_payload = p->payload;
+#endif
+        ret = RAW_INPUT_DELIVERED;
+        eaten = pcb->recv(pcb->recv_arg, pcb, p, ip_current_src_addr());
+        if (eaten != 0) {
+          /* receive function ate the packet */
+          p = NULL;
+          if (prev != NULL) {
+            /* move the pcb to the front of raw_pcbs so that is
+               found faster next time */
+            prev->next = pcb->next;
+            pcb->next = raw_pcbs;
+            raw_pcbs = pcb;
+          }
+          return RAW_INPUT_EATEN;
+        } else {
+          /* sanity-check that the receive callback did not alter the pbuf */
+          LWIP_ASSERT("raw pcb recv callback altered pbuf payload pointer without eating packet",
+                      p->payload == old_payload);
+        }
+      }
+    }
+#endif /* CONFIG_SUPPORT_LWIP_RAW_SOCKET */
     /* drop the packet */
     prev = pcb;
     pcb = pcb->next;
@@ -361,6 +410,30 @@ raw_sendto(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *ipaddr)
     return ERR_VAL;
   }
 
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+  struct eth_hdr *ethhdr;
+  uint8_t eth_proto = ETHPROTO_MAX;
+
+  if(pcb->protocol < ETHPROTO_MAX && pcb->protocol >= ETHPROTO_IP){
+    ethhdr = (struct eth_hdr *)p->payload;
+
+    if(ethhdr->type == PP_HTONS(ETHTYPE_EAP)){
+      eth_proto = ETHPROTO_EAP;
+    }
+    else if(ethhdr->type == PP_HTONS(ETHTYPE_IP)){
+      eth_proto = ETHPROTO_IP;
+    }
+
+    if(pcb->protocol == eth_proto)
+    {
+      netif = netif_get_by_index(pcb->netif_idx);
+      u16_t eth_type = *((u16_t*)(p->payload+12));
+      return netif->linkoutput(netif, p);
+    }
+  }
+  
+#endif /* CONFIG_SUPPORT_LWIP_RAW_SOCKET */
+  
   LWIP_DEBUGF(RAW_DEBUG | LWIP_DBG_TRACE, ("raw_sendto\n"));
 
   if (pcb->netif_idx != NETIF_NO_INDEX) {
@@ -617,6 +690,16 @@ raw_new(u8_t proto)
 #endif /* LWIP_MULTICAST_TX_OPTIONS */
     pcb->next = raw_pcbs;
     raw_pcbs = pcb;
+
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+#if LWIP_RAW
+    if(proto < ETHPROTO_MAX && proto >= ETHPROTO_IP){
+      /*when ip proto is raw, send the packet to netif anyway*/
+      pcb->netif_idx = nt_get_netifidx_by_devmode(STA_DEVICE);
+    }
+    
+#endif /* LWIP_RAW */
+#endif /* CONFIG_SUPPORT_LWIP_RAW_SOCKET */
   }
   return pcb;
 }

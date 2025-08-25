@@ -548,7 +548,7 @@ tcp_write(struct tcp_pcb *pcb, const void *arg, u16_t len, u8_t apiflags)
      * oversize info is lost.
      */
 #ifdef CONFIG_LWIP_MULTIPLE_STREAMS
-    if ((pos < len) && (space > 0) && (last_unsent->len > 0) && (seg->tcphdr->seqno + len == pcb->snd_lbb + pos)) {
+    if ((pos < len) && (space > 0) && (last_unsent->len > 0) && (seg->tcphdr->seqno + len == pcb->snd_lbb + pos) && (pcb->snd_nxt <= seg->tcphdr->seqno)) {
 #else
     if ((pos < len) && (space > 0) && (last_unsent->len > 0)) {
 #endif

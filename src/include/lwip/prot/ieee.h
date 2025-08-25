@@ -81,7 +81,10 @@ enum lwip_ieee_eth_type {
   /** Precision time protocol */
   ETHTYPE_PTP       = 0x88F7U,
   /** Q-in-Q, 802.1ad */
-  ETHTYPE_QINQ      = 0x9100U
+  ETHTYPE_QINQ      = 0x9100U,
+  /*EAPOL*/
+  ETHTYPE_EAP      = 0x888EU
+
 };
 
 #ifdef __cplusplus

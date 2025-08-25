@@ -82,6 +82,8 @@
 #define LWIP_NETCONN 0
 #endif
 
+#include "lwip/prot/ethernet.h"
+
 #define API_SELECT_CB_VAR_REF(name)               API_VAR_REF(name)
 #define API_SELECT_CB_VAR_DECLARE(name)           API_VAR_DECLARE(struct lwip_select_cb, name)
 #define API_SELECT_CB_VAR_ALLOC(name, retblock)   API_VAR_ALLOC_EXT(struct lwip_select_cb, MEMP_SELECT_CB, name, retblock)
@@ -1628,6 +1630,33 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
 #endif /* LWIP_TCP */
   }
 
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+  struct eth_hdr *ethhdr;
+  uint8_t eth_proto = ETHPROTO_MAX;
+
+  if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) == NETCONN_RAW){
+    ethhdr = (struct eth_hdr *)data;
+
+    if(ethhdr->type == PP_HTONS(ETHTYPE_EAP)){
+      eth_proto = ETHPROTO_EAP;
+    }
+    else if(ethhdr->type == PP_HTONS(ETHTYPE_IP)){
+      eth_proto = ETHPROTO_IP;
+    }
+
+    if((sock->conn->pcb.raw->protocol == eth_proto) && 
+      (sock->conn->pcb.raw->protocol < ETHPROTO_MAX && sock->conn->pcb.raw->protocol >= ETHPROTO_IP)){
+      /* initialize a buffer */
+      buf.p = buf.ptr = NULL;
+      short_size = (u16_t)size;
+      err = netbuf_ref(&buf, data, short_size);
+      /* send the data */
+      err = netconn_send(sock->conn, &buf);
+      return (err == ERR_OK ? size : -1);
+    }
+  }
+#endif /* CONFIG_SUPPORT_LWIP_RAW_SOCKET */
+
   if (size > LWIP_MIN(0xFFFF, SSIZE_MAX)) {
     /* cannot fit into one datagram (at least for us) */
     sock_set_errno(sock, EMSGSIZE);
@@ -1712,6 +1741,20 @@ lwip_socket(int domain, int type, int protocol)
   /* create a netconn */
   switch (type) {
     case SOCK_RAW:
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+      /* for AF_PACKET family, we support only SOCK_RAW */
+      if (domain == AF_PACKET)
+      {
+          /* for AF_PACKET/SOCK_RAW, we use only protocol reserved for ethernet type */
+          if (protocol < ETHPROTO_IP && protocol > ETHPROTO_MAX)  
+          {
+              return -1;
+          }
+
+          /* Treat AF_PACKET/SOCK_RAW as an AF_INET/SOCK_RAW socket */
+          domain = AF_INET;
+      }
+#endif /*CONFIG_SUPPORT_LWIP_RAW_SOCKET*/
       conn = netconn_new_with_proto_and_callback(DOMAIN_TO_NETCONN_TYPE(domain, NETCONN_RAW),
              (u8_t)protocol, DEFAULT_SOCKET_EVENTCB);
       LWIP_DEBUGF(SOCKETS_DEBUG, ("lwip_socket(%s, SOCK_RAW, %d) = ",

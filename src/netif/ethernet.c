@@ -44,9 +44,15 @@
  */
 
 #include "lwip/opt.h"
+#include "pbuf.h"
+#include "prot/ieee.h"
 #include "safeAPI.h"
 
 #if LWIP_ARP || LWIP_ETHERNET
+
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+#define LWIP_HOOK_UNKNOWN_ETH_PROTOCOL raw_input
+#endif /* CONFIG_SUPPORT_LWIP_RAW_SOCKET*/
 
 #include "netif/ethernet.h"
 #include "lwip/def.h"
@@ -54,6 +60,7 @@
 #include "lwip/etharp.h"
 #include "lwip/ip.h"
 #include "lwip/snmp.h"
+#include "lwip/priv/raw_priv.h"
 
 #include <string.h>
 
@@ -191,6 +198,7 @@ ethernet_input(struct pbuf *p, struct netif *netif)
       if (!(netif->flags & NETIF_FLAG_ETHARP)) {
         goto free_and_return;
       }
+
       /* skip Ethernet header (min. size checked above) */
       if (pbuf_remove_header(p, next_hdr_offset)) {
         LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING,
@@ -199,6 +207,10 @@ ethernet_input(struct pbuf *p, struct netif *netif)
         LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE, ("Can't move over header in packet"));
         goto free_and_return;
       } else {
+
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+      p->flags |= PBUF_FLAG_IP_ETH_STRIPPED;
+#endif /*CONFIG_SUPPORT_LWIP_RAW_SOCKET*/
         /* pass to IP layer */
         ip4_input(p, netif);
       }
@@ -208,6 +220,7 @@ ethernet_input(struct pbuf *p, struct netif *netif)
       if (!(netif->flags & NETIF_FLAG_ETHARP)) {
         goto free_and_return;
       }
+
       /* skip Ethernet header (min. size checked above) */
       if (pbuf_remove_header(p, next_hdr_offset)) {
         LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING,
@@ -235,6 +248,7 @@ ethernet_input(struct pbuf *p, struct netif *netif)
 
 #if LWIP_IPV6
     case PP_HTONS(ETHTYPE_IPV6): /* IPv6 */
+
       /* skip Ethernet header */
       if ((p->len < next_hdr_offset) || pbuf_remove_header(p, next_hdr_offset)) {
         LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING,
@@ -242,6 +256,9 @@ ethernet_input(struct pbuf *p, struct netif *netif)
                      p->tot_len, next_hdr_offset));
         goto free_and_return;
       } else {
+#ifdef CONFIG_SUPPORT_LWIP_RAW_SOCKET
+        p->flags |= PBUF_FLAG_IP_ETH_STRIPPED;
+#endif /*CONFIG_SUPPORT_LWIP_RAW_SOCKET*/
         /* pass to IPv6 layer */
         ip6_input(p, netif);
       }
@@ -250,9 +267,10 @@ ethernet_input(struct pbuf *p, struct netif *netif)
 
     default:
 #ifdef LWIP_HOOK_UNKNOWN_ETH_PROTOCOL
-      if (LWIP_HOOK_UNKNOWN_ETH_PROTOCOL(p, netif) == ERR_OK) {
-        break;
+      if (LWIP_HOOK_UNKNOWN_ETH_PROTOCOL(p, netif) != RAW_INPUT_EATEN) {
+        pbuf_free(p);
       }
+      break;
 #endif
       ETHARP_STATS_INC(etharp.proterr);
       ETHARP_STATS_INC(etharp.drop);
