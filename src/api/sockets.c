@@ -1650,9 +1650,16 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
       buf.p = buf.ptr = NULL;
       short_size = (u16_t)size;
       err = netbuf_ref(&buf, data, short_size);
-      /* send the data */
-      err = netconn_send(sock->conn, &buf);
-      return (err == ERR_OK ? size : -1);
+      if(err == ERR_OK){
+          /* send the data */
+          err = netconn_send(sock->conn, &buf);
+      }
+      /* deallocated the buffer */
+      netbuf_free(&buf);
+
+      sock_set_errno(sock, err_to_errno(err));
+      done_socket(sock);
+      return (err == ERR_OK ? short_size : -1);
     }
   }
 #endif /* CONFIG_SUPPORT_LWIP_RAW_SOCKET */
